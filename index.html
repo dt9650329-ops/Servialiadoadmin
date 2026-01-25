@@ -1,0 +1,3169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Domicilios — Admin</title>
+
+<!-- Leaflet CSS para el mapa -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<style>
+  /* PALETA: #1A1A1A (Negro), #FFD700 (Dorado), #E0E0E0 (Plateado/Gris Claro), #555555 (Gris Oscuro) */
+  
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: #1A1A1A;
+    color: #E0E0E0;
+  }
+
+  /* ==================== LOGIN OVERLAY ==================== */
+  #adminLogin {
+    position: fixed; 
+    top: 0; left: 0; 
+    width: 100%; height: 100%; 
+    background: #1A1A1A;
+    z-index: 2000; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    flex-direction: column;
+  }
+  
+  #adminLogin > div {
+    background: #2C2C2C;
+    padding: 30px; 
+    border-radius: 10px; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5); 
+    width: 90%; 
+    max-width: 350px;
+    box-sizing: border-box;
+  }
+  
+  #adminLogin h3 { color: #FFD700; }
+  
+  #adminLogin input {
+    width: 100%; 
+    padding: 10px; 
+    margin-bottom: 10px; 
+    border: 1px solid #555; 
+    border-radius: 4px; 
+    box-sizing: border-box;
+    background-color: #444;
+    color: #E0E0E0;
+  }
+  
+  #adminLogin button {
+    width: 100%; 
+    padding: 10px; 
+    background: #FFD700;
+    color: #1A1A1A;
+    border: none; 
+    border-radius: 4px; 
+    font-weight: bold; 
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  #adminLogin button:hover {
+      background: #FFE54C;
+  }
+  
+  #loginError { color: #FFD700 !important; }
+
+  /* ==================== HEADER Y TABS ==================== */
+  header {
+    display: flex;
+    width: 100%; 
+    background: #2C2C2C;
+    border-bottom: 2px solid #444;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    justify-content: center; 
+  }
+  
+  .header-content-wrapper {
+      display: flex;
+      width: 100%; 
+      max-width: 1400px; 
+      overflow-x: auto; 
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 15px 8px;
+    border: none;
+    background: none;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #E0E0E0;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease-in-out;
+    white-space: nowrap; 
+    min-width: fit-content;
+  }
+
+  .tab-btn.active {
+    color: #FFD700;
+    border-bottom: 3px solid #FFD700;
+  }
+
+  /* ==================== SECCIONES PRINCIPALES ==================== */
+  section {
+    display: none;
+    padding: 20px;
+    max-width: 1400px; 
+    margin: 0 auto; 
+    min-height: calc(100vh - 80px); 
+    box-sizing: border-box; 
+  }
+
+  section.active {
+    display: block;
+    display: flex; 
+    flex-direction: column;
+  }
+  
+  section h2 { color: #FFD700; } 
+
+  /* ==================== CHAT CONTAINER ==================== */
+  .chat-container {
+    display: flex;
+    gap: 20px;
+    flex-grow: 1; 
+  }
+  
+  .chat-sidebar {
+    flex: 1;
+    min-width: 250px;
+    height: 100%; 
+    overflow-y: auto;
+    transition: all 0.3s;
+    display: block; 
+  }
+  
+  .chat-box {
+    flex: 2;
+    min-height: 400px;
+    display: none; 
+    flex-direction: column;
+    justify-content: space-between;
+    background: #2C2C2C;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  
+  #clientes.active-chat .chat-box {
+      display: flex;
+  }
+  
+  #clientes.active-chat .chat-sidebar {
+      min-width: 300px; 
+  }
+
+  /* ==================== LISTAS DE CHAT ==================== */
+  .chat-list, .historial-list {
+    background: #2C2C2C;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    min-height: 600px; 
+  }
+  
+  .chat-list p { color: #E0E0E0; } 
+
+  .chat-item {
+    position: relative; 
+    padding: 10px;
+    border-bottom: 1px solid #444;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+    flex-wrap: wrap; 
+    color: #E0E0E0;
+  }
+  
+  .historial-item-container {
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+  }
+  
+  .historial-item-container strong {
+      color: #FFD700;
+  }
+  
+  .historial-item-container span {
+      font-size: 12px;
+      color: #A0A0A0;
+  }
+
+  .chat-item:hover {
+    background: #333;
+  }
+  
+  .chat-item.active-client {
+      background: #444;
+      border-left: 5px solid #FFD700;
+  }
+
+  .new-messages-badge {
+    background-color: #FFD700;
+    color: #1A1A1A;
+    border-radius: 50%;
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 15px;
+    text-align: center;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  
+  .chat-item .message-hint {
+      color: #FFD700;
+      font-size: 18px;
+      margin-right: 15px;
+      display: inline-block;
+  }
+
+  /* ==================== CHAT BOX INFO ==================== */
+  .chat-box-info {
+    font-size: 11px;
+    color: #E0E0E0;
+    margin: 5px 0 10px 0; 
+    padding: 5px 8px;
+    border: 1px solid #555;
+    border-radius: 5px;
+    background-color: #333;
+    white-space: pre-wrap; 
+    cursor: text; 
+    line-height: 1.1;
+  }
+
+  .chat-box-info.repartidor-compact div { 
+      margin-bottom: 0px;
+      padding: 1px 0;
+  }
+  
+  .chat-box-info div { 
+      margin-bottom: 1px;
+  }
+
+  .chat-box-info strong {
+      display: inline-block;
+      min-width: 60px; 
+      color: #FFD700;
+  }
+  
+  .chat-box-info a {
+      color: #5bc0de; 
+      text-decoration: none;
+      font-weight: bold;
+  }
+
+  /* ==================== MENSAJES ÁREA ==================== */
+  .mensajes-area {
+    flex-grow: 1; 
+    overflow-y: auto; 
+    padding-right: 10px;
+    min-height: 550px;
+  }
+
+  .chat-header-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px; 
+  }
+  
+  .chat-box h3 { 
+      color: #E0E0E0; 
+      margin-top: 0; 
+      font-size: 18px; 
+  } 
+
+  .back-btn, .back-historial-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      margin-right: 10px;
+      cursor: pointer;
+      color: #FFD700;
+      padding: 0;
+      line-height: 1;
+      font-weight: bold;
+      display: none; 
+  }
+  
+  /* ==================== CHAT FOOTER ==================== */
+  .chat-footer {
+    padding-top: 10px; 
+    border-top: 1px solid #444;
+    flex-shrink: 0; 
+  }
+
+  .chat-input-area {
+    display: flex;
+    gap: 8px; 
+    margin-top: 10px;
+    align-items: center;
+  }
+
+  .chat-input-area input[type="text"] {
+    flex-grow: 1; 
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background-color: #444;
+    color: #E0E0E0;
+    min-width: 150px; 
+  }
+  
+  .chat-input-area input:disabled { background-color: #333; }
+
+  .media-btn {
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 18px; 
+    line-height: 1;
+    background: #555555; 
+    color: #E0E0E0;
+    transition: background 0.2s;
+  }
+  .media-btn:hover:not(:disabled) {
+    background: #777777;
+  }
+  
+  .media-btn.recording-active {
+    background: #ff4444 !important;
+    animation: pulse 1.5s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .chat-input-area button {
+    padding: 10px 15px; 
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s;
+    color: #1A1A1A;
+  }
+
+  #enviarBtn {
+    background: #FFD700;
+  }
+  
+  #enviarBtn:hover:not(:disabled) {
+    background: #FFE54C;
+  }
+  
+  .cerrar-chat-btn {
+    background: #555555 !important;
+    color: #E0E0E0 !important;
+  }
+
+  .cerrar-chat-btn:hover:not(:disabled) {
+    background: #777777 !important;
+  }
+  
+  #file-upload-status {
+    width: 100%;
+    text-align: center;
+    margin-top: 10px;
+    color: #FFD700;
+    font-weight: bold;
+    display: none;
+  }
+  
+  #audio-recording-status {
+    text-align: center;
+    margin-top: 10px;
+    color: #ff4444;
+    font-weight: bold;
+    display: none;
+  }
+  /* ==================== REPARTIDORES LAYOUT ==================== */
+  .repartidores-layout {
+      display: flex;
+      gap: 20px;
+      justify-content: space-between; 
+  }
+
+  .repartidores-layout > div {
+      flex: 1; 
+      min-width: 250px; 
+  }
+  
+  #repartidoresLayoutForm {
+      flex: 1.5;
+  }
+
+  .repartidores-layout h4 { color: #FFD700; } 
+
+  #formNuevoPedido {
+      background: #2C2C2C; 
+      padding: 20px; 
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+
+  #formNuevoPedido label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+      color: #E0E0E0;
+  }
+  
+  #repartidorSelect, #clienteSelect {
+      width: 100%; 
+      padding: 10px; 
+      margin-top: 5px; 
+      border: 1px solid #555;
+      border-radius: 4px;
+      box-sizing: border-box;
+      background: #444; 
+      color: #E0E0E0;
+      font-weight: bold;
+  }
+  
+  #repartidorSelect option, #clienteSelect option { background-color: #444; }
+
+  #formNuevoPedido input[type="text"], 
+  #formNuevoPedido input[type="tel"], 
+  #formNuevoPedido input[type="number"], 
+  #formNuevoPedido textarea {
+      width: 100%; 
+      padding: 10px; 
+      margin-top: 5px; 
+      border: 1px solid #555;
+      border-radius: 4px;
+      box-sizing: border-box;
+      background: #444;
+      color: #E0E0E0;
+  }
+  
+  .monto-rapido-container {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+  }
+  
+  .monto-rapido-btn {
+      flex: 1 1 calc(33.33% - 10px);
+      padding: 8px;
+      background: #555555; 
+      color: #E0E0E0;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+  }
+  .monto-rapido-btn:hover { background: #777777; }
+  
+  .monto-rapido-container.second-row .monto-rapido-btn {
+      flex: 1 1 calc(50% - 10px);
+  }
+
+  #enviarPedidoBtn {
+      background: #FFD700; 
+      color: #1A1A1A;
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+  }
+  #enviarPedidoBtn:hover { background: #FFE54C; }
+  
+  /* ==================== MENSAJES ==================== */
+  .mensaje {
+    padding: 8px 12px 5px 12px; 
+    border-radius: 12px;
+    margin: 4px 0; 
+    max-width: 80%;
+    word-wrap: break-word;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chat-time {
+    font-size: 10px;
+    margin-top: 0;
+    display: block; 
+    text-align: right; 
+    color: rgba(255, 255, 255, 0.7); 
+    line-height: 1.2;
+  }
+
+  .usuario .chat-time {
+    color: rgba(0, 0, 0, 0.7);
+  }
+  
+  .admin { 
+    background-color: #FFD700;
+    color: #1A1A1A;
+    align-self: flex-end;
+    margin-left: auto;
+    border-radius: 12px 12px 0 12px;
+  }
+  .admin .chat-time {
+      color: rgba(0, 0, 0, 0.7);
+  }
+
+  .usuario { 
+    background-color: #E0E0E0;
+    color: #1A1A1A;
+    align-self: flex-start;
+    margin-right: auto;
+    border-radius: 12px 12px 12px 0;
+  }
+
+  .repartidor-msg {
+    background-color: #555555;
+    color: #E0E0E0;
+    align-self: flex-start;
+    margin-right: auto;
+    border-radius: 12px 12px 12px 0;
+  }
+  .repartidor-msg .chat-time {
+      color: rgba(255, 255, 255, 0.7);
+  }
+  
+  #chatBox p { color: #E0E0E0; } 
+  
+  .mensaje-content img {
+      max-width: 100%; 
+      border-radius: 8px;
+      display: block;
+      margin: 0 auto;
+      height: auto;
+      cursor: pointer;
+  }
+  .mensaje-content audio {
+      width: 100%; 
+      max-width: 280px;
+      margin-top: 5px;
+  }
+  .mensaje-content a {
+      color: #1A1A1A; 
+      text-decoration: none;
+      font-weight: bold;
+      display: inline-block;
+  }
+  .usuario .mensaje-content a, .repartidor-msg .mensaje-content a {
+      color: #5bc0de;
+  }
+
+  /* ==================== MAPA ==================== */
+  #mapaRepartidores {
+      padding: 20px;
+  }
+  
+  #mapContainer {
+      width: 100%;
+      height: calc(100vh - 180px);
+      background: #2C2C2C;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      position: relative;
+      overflow: hidden;
+  }
+  
+  #map {
+      width: 100%;
+      height: 100%;
+      border-radius: 10px;
+  }
+  
+  #mapLegend {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(44, 44, 44, 0.95);
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      z-index: 500;
+      max-width: 250px;
+      border: 1px solid #555;
+  }
+  
+  #mapLegend h4 {
+      margin: 0 0 10px 0;
+      color: #FFD700;
+      font-size: 14px;
+  }
+  
+  .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #E0E0E0;
+  }
+  
+  .legend-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      margin-right: 8px;
+      flex-shrink: 0;
+      border: 2px solid #1A1A1A;
+  }
+  
+  .legend-icon.online {
+      background: #27ae60;
+      box-shadow: 0 0 10px rgba(39, 174, 96, 0.6);
+  }
+  
+  .legend-icon.offline {
+      background: #555555;
+  }
+  
+  #mapStats {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #444;
+  }
+  
+  #mapStats p {
+      margin: 5px 0;
+      font-size: 11px;
+      color: #A0A0A0;
+  }
+  
+  #mapStats strong {
+      color: #FFD700;
+  }
+  
+  #lastMapUpdate {
+      font-size: 9px;
+      color: #FFD700;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed #555;
+      text-align: center;
+  }
+  
+  .leaflet-popup-content-wrapper {
+      background: #2C2C2C;
+      color: #E0E0E0;
+      border-radius: 8px;
+  }
+  
+  .leaflet-popup-content {
+      margin: 10px;
+  }
+  
+  .leaflet-popup-content strong {
+      color: #FFD700;
+  }
+  
+  .leaflet-popup-tip {
+      background: #2C2C2C;
+  }
+
+  /* ==================== HISTORIAL ==================== */
+  .historial-step-item {
+      padding: 12px;
+      border-bottom: 1px solid #444;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.2s;
+      background: #2C2C2C;
+      margin-bottom: 5px;
+      border-radius: 6px;
+  }
+  
+  .historial-step-item:hover {
+      background: #333;
+  }
+  
+  .historial-step-item .historial-item-container strong {
+       font-size: 16px;
+  }
+
+  .pedido-historial-item {
+      padding: 15px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: #2C2C2C;
+      position: relative;
+      overflow: hidden;
+  }
+  
+  .pedido-historial-item strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 16px;
+      color: #FFD700;
+  }
+  
+  .detalle-linea {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 2px;
+      border-bottom: 1px dashed #3a3a3a;
+      padding-bottom: 2px;
+  }
+  
+  .detalle-linea span.valor {
+      text-align: right;
+      max-width: 70%;
+      word-wrap: break-word;
+      color: #E0E0E0;
+  }
+  
+  .estado-badge {
+      position: absolute;
+      top: 0;
+      right: 0;
+      padding: 5px 10px;
+      font-size: 10px;
+      font-weight: bold;
+      color: #1A1A1A;
+  }
+
+  .estado-badge.pendiente { 
+      background-color: #C0392B;
+      color: #E0E0E0;
+  }
+  .estado-badge.aceptado { 
+      background-color: #FFD700;
+      color: #1A1A1A;
+  }
+  .estado-badge.esperando { 
+      background-color: #E67E22;
+      color: #E0E0E0;
+  }
+  .estado-badge.en-camino { 
+      background-color: #2980B9;
+      color: #E0E0E0;
+  }
+  .estado-badge.completado,
+  .estado-badge.entregado { 
+      background-color: #27ae60;
+      color: #E0E0E0;
+  }
+  .estado-badge.cancelado { 
+      background-color: #dc3545;
+      color: #E0E0E0;
+  }
+
+  .pedido-action-container {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+  }
+  
+  .pedido-action-btn {
+      padding: 8px 12px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+      transition: background 0.2s;
+      color: #1A1A1A;
+  }
+  
+  .btn-reenviar {
+      background-color: #FFD700;
+      color: #1A1A1A;
+  }
+  .btn-cancelar {
+      background-color: #dc3545;
+      color: #E0E0E0;
+  }
+  .btn-editar {
+      background-color: #007bff;
+      color: #E0E0E0;
+  }
+  
+  .pedido-historial-item .estado-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+      animation: pulse 2s infinite;
+  }
+  
+  .estado-indicator.pendiente { background-color: #C0392B; }
+  .estado-indicator.aceptado { background-color: #FFD700; }
+  .estado-indicator.esperando { background-color: #E67E22; }
+  .estado-indicator.en-camino { background-color: #2980B9; }
+  .estado-indicator.completado { background-color: #27ae60; }
+  
+  .pedido-timer {
+      font-size: 12px;
+      color: #FFD700;
+      font-weight: bold;
+      margin-top: 5px;
+      display: block;
+  }
+  /* ==================== MODALES ==================== */
+  .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 3000; 
+    }
+
+    .modal-content {
+        background: #2C2C2C;
+        padding: 25px;
+        border-radius: 10px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    }
+    
+    .modal-content h4 {
+        color: #FFD700;
+        margin-top: 0;
+    }
+    
+    .modal-content label {
+        display: block;
+        margin-top: 10px;
+        font-weight: bold;
+        color: #E0E0E0;
+    }
+    
+    .modal-content input[type="text"],
+    .modal-content input[type="number"],
+    .modal-content textarea,
+    .modal-content input[type="email"],
+    .modal-content input[type="password"] {
+        width: 100%;
+        padding: 10px;
+        margin-top: 5px;
+        border: 1px solid #555;
+        border-radius: 4px;
+        box-sizing: border-box;
+        background: #444;
+        color: #E0E0E0;
+    }
+
+    .modal-actions {
+        margin-top: 20px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .modal-actions button {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    .btn-guardar {
+        background-color: #28a745;
+        color: #1A1A1A;
+    }
+
+    .btn-cerrar {
+        background-color: #555555;
+        color: #E0E0E0;
+    }
+    
+    #actionAuthModal .modal-content {
+        max-width: 350px;
+    }
+    
+    #authError {
+        color: #dc3545;
+        margin-top: 10px;
+        text-align: center;
+    }
+  /* ==================== RESPONSIVE DESIGN ==================== */
+  @media (max-width: 768px) {
+    
+      .header-content-wrapper {
+          max-width: 100%;
+          overflow-x: auto; 
+          justify-content: flex-start;
+      }
+      
+      .tab-btn {
+          font-size: 12px; 
+          padding: 12px 6px; 
+          flex: 0 0 auto; 
+      }
+      
+      .chat-container {
+          flex-direction: column; 
+          gap: 0;
+      }
+      
+      .chat-sidebar {
+           flex-direction: column;
+           min-height: calc(100vh - 80px - 40px); 
+           min-width: 100%; 
+           display: flex; 
+      }
+      
+      .chat-box {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          z-index: 999; 
+          border-radius: 0;
+          background: #1A1A1A; 
+          padding: 10px; 
+          box-sizing: border-box; 
+          display: none; 
+      }
+      
+      .chat-box .back-btn {
+          display: block; 
+      }
+      
+      .mensajes-area {
+          flex-grow: 1; 
+          min-height: 100px; 
+          padding-bottom: 200px;
+          padding-right: 5px;
+      }
+      
+      .chat-footer {
+          position: fixed; 
+          bottom: 0;
+          left: 0;
+          width: 100%;
+          background: #2C2C2C; 
+          padding: 5px 10px 1px;
+          border-top: 1px solid #444;
+          z-index: 50;
+          box-sizing: border-box; 
+      }
+      
+      .chat-input-area {
+          flex-wrap: wrap; 
+          gap: 6px;
+          margin-top: 0;
+      }
+      
+      .media-btn {
+          padding: 8px 10px;
+          font-size: 16px;
+          flex: 0 0 auto; 
+          order: 0;
+      }
+      
+      .chat-input-area input[type="text"] {
+          flex: 1 1 100%; 
+          order: 1;
+          padding: 8px;
+      }
+      
+      #enviarBtn {
+          flex: 1 1 48%;
+          padding: 8px 10px;
+          font-size: 14px;
+          order: 2;
+      }
+      
+      .cerrar-chat-btn {
+          flex: 1 1 48%;
+          padding: 8px 10px;
+          font-size: 14px;
+          order: 2;
+      }
+
+      .chat-box-info {
+        margin: 5px 0; 
+      }
+      
+      .repartidores-layout {
+          flex-direction: column;
+      }
+      
+      .repartidores-layout > div {
+          flex: 0 0 100%;
+          min-width: 100%;
+          margin-bottom: 20px;
+      }
+      
+      .chat-list, .historial-list {
+          min-height: 200px; 
+      }
+      
+      .monto-rapido-btn {
+          font-size: 12px;
+          padding: 6px;
+          flex: 1 1 45%;
+      }
+      
+      .back-historial-btn {
+          display: block;
+      }
+      
+      #mapContainer {
+          height: calc(100vh - 150px);
+      }
+      
+      #mapLegend {
+          max-width: 180px;
+          font-size: 10px;
+          padding: 10px;
+      }
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== LOGIN OVERLAY ==================== -->
+<div id="adminLogin">
+    <div>
+        <h3 style="margin-top: 0; text-align: center; color: #FFD700;">Acceso al Panel Admin</h3>
+        <input type="email" id="loginEmail" placeholder="Email del Administrador">
+        <input type="password" id="loginPassword" placeholder="Contraseña">
+        <button id="loginBtn">
+            Iniciar Sesión
+        </button>
+        <p id="loginError" style="color: #FFD700; margin-top: 10px; text-align: center;"></p>
+    </div>
+</div>
+
+<!-- ==================== HEADER NAVIGATION ==================== -->
+<header>
+  <div class="header-content-wrapper">
+    <button class="tab-btn active" data-tab="clientes">&#x1F4AC; Chats</button>
+    <button class="tab-btn" data-tab="repartidores">&#x1F6B6; Repartidores</button>
+    <button class="tab-btn" data-tab="historialPedidos">&#x1F4DA; Historial</button>
+    <button class="tab-btn" data-tab="mapaRepartidores">&#x1F5FA; Mapa</button>
+  </div>
+</header>
+
+<!-- ==================== SECCIÓN: CHATS ==================== -->
+<section id="clientes" class="active">
+  <h2 id="clientesTitle" style="margin-top:0; margin-bottom: 10px;">Chats Activos</h2>
+  <div class="chat-container">
+    <div class="chat-sidebar">
+      <div class="chat-list" id="listaChats">Cargando chats...</div>
+    </div>
+    
+    <div class="chat-box" id="chatBoxContainer">
+      <div id="chatBoxHeader">
+          <h3>Selecciona un chat para interactuar</h3>
+      </div>
+      
+      <div class="mensajes-area" id="chatBox"></div>
+      
+      <div class="chat-footer">
+          <div class="chat-input-area" id="chatInputArea">
+            <button id="fotoBtn" class="media-btn" disabled title="Enviar Foto">&#x1F4F7;</button>
+            <button id="audioBtn" class="media-btn" disabled title="Grabar Audio">&#x1F3A4;</button>
+            
+            <input type="text" id="mensajeInput" placeholder="Escribe tu respuesta aquí..." disabled>
+            
+            <input type="file" id="fileInputFoto" accept="image/*" style="display: none;">
+            <input type="file" id="fileInputAudio" accept="audio/*" style="display: none;">
+            
+            <button id="enviarBtn" disabled>Enviar</button>
+            <button id="cerrarChatBtn" class="cerrar-chat-btn" disabled>Eliminar Chat</button> 
+          </div>
+          
+          <div id="audio-recording-status"></div>
+          <div id="file-upload-status"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SECCIÓN: REPARTIDORES ==================== -->
+<section id="repartidores">
+    <h2 style="margin-top:0;">&#x1F6B6; Repartidores Conectados y Gestión</h2>
+    <div class="repartidores-layout">
+        
+        <div>
+            <h4>Repartidores Online</h4>
+            <div class="historial-list" id="listaRepartidores">Cargando repartidores...</div>
+        </div>
+        
+        <div id="repartidoresLayoutForm">
+            <h4>Crear Nuevo Pedido (Notificación a Repartidores)</h4>
+            <form id="formNuevoPedido">
+                <label>Asignar a Repartidor Online:</label>
+                <select id="repartidorSelect" required>
+                    <option value="">Cargando Repartidores...</option>
+                </select>
+                
+                <label style="margin-top: 15px;">Preseleccionar Cliente Registrado (Solo Chats Activos):</label>
+                <select id="clienteSelect">
+                    <option value="">--- Seleccionar Cliente ---</option>
+                </select>
+                <label>Descripción del Pedido:</label>
+                <textarea id="pedidoDescripcion" rows="3" required></textarea>
+                <label>Dirección del Cliente:</label>
+                <input type="text" id="pedidoDireccion" required>
+                <label>Nombre del Cliente (Opcional):</label>
+                <input type="text" id="pedidoNombreCliente">
+                <label>Teléfono Cliente:</label>
+                <input type="tel" id="pedidoTelefono" required>
+                <label>Monto Total ($):</label>
+                <input type="number" id="pedidoMonto" required>
+                
+                <div class="monto-rapido-container">
+                    <button type="button" class="monto-rapido-btn" data-monto="5000">Domicilio $5000</button>
+                    <button type="button" class="monto-rapido-btn" data-monto="6000">Domicilio $6000</button>
+                    <button type="button" class="monto-rapido-btn" data-monto="7000">Domicilio $7000</button>
+                </div>
+                
+                <div class="monto-rapido-container second-row">
+                    <button type="button" class="monto-rapido-btn" data-monto="12000">Calarca $12.000</button>
+                    <button type="button" class="monto-rapido-btn" data-monto="12000">Circasia $12.000</button>
+                    <button type="button" class="monto-rapido-btn" data-monto="12000">P. Tapao $12.000</button>
+                    <button type="button" class="monto-rapido-btn" data-monto="13000">Montenegro $13.000</button>
+                    <button type="button" class="monto-rapido-btn" data-monto="13000">Tebaida $13.000</button>
+                </div>
+                
+                <button type="submit" id="enviarPedidoBtn">Enviar Pedido a Repartidor Seleccionado</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<!-- ==================== SECCIÓN: HISTORIAL ==================== -->
+<section id="historialPedidos">
+  <h2 id="historialPedidosTitle">&#x1F4DA; Historial de Pedidos Asignados</h2>
+  <div class="historial-step-list" id="listaHistorialPedidos">Cargando historial...</div>
+</section>
+
+<!-- ==================== SECCIÓN: MAPA ==================== -->
+<section id="mapaRepartidores">
+  <h2 style="margin-top:0;">&#x1F5FA; Ubicación en Tiempo Real de Repartidores</h2>
+  <div id="mapContainer">
+      <div id="map"></div>
+      <div id="mapLegend">
+          <h4>🗺️ Leyenda</h4>
+          <div class="legend-item">
+              <div class="legend-icon online"></div>
+              <span>Repartidor Online</span>
+          </div>
+          <div class="legend-item">
+              <div class="legend-icon offline"></div>
+              <span>Repartidor Offline</span>
+          </div>
+          <div id="mapStats">
+              <p><strong>Total:</strong> <span id="totalReps">0</span></p>
+              <p><strong>Online:</strong> <span id="onlineReps">0</span></p>
+              <p><strong>Offline:</strong> <span id="offlineReps">0</span></p>
+              <p id="lastMapUpdate">Esperando datos GPS...</p>
+          </div>
+      </div>
+  </div>
+</section>
+
+<!-- ==================== MODAL: EDITAR PEDIDO ==================== -->
+<div id="editarPedidoModal" class="modal-overlay">
+    <div class="modal-content">
+        <h4>&#x1F58A; Editar Pedido <span id="editPedidoIdDisplay"></span></h4>
+        <form id="formEditarPedido">
+            <input type="hidden" id="editPedidoId">
+            <input type="hidden" id="editOriginalMonto">
+            
+            <label for="editPedidoDescripcion">Descripción del Pedido:</label>
+            <textarea id="editPedidoDescripcion" rows="3" required></textarea>
+            
+            <label for="editPedidoDireccion">Dirección del Cliente:</label>
+            <input type="text" id="editPedidoDireccion" required>
+            
+            <label for="editPedidoNombreCliente">Nombre del Cliente (Opcional):</label>
+            <input type="text" id="editPedidoNombreCliente">
+            
+            <label for="editPedidoTelefono">Teléfono Cliente:</label>
+            <input type="tel" id="editPedidoTelefono" required>
+            
+            <label for="editPedidoMonto">Monto Total ($):</label>
+            <input type="number" id="editPedidoMonto" required>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-cerrar" onclick="document.getElementById('editarPedidoModal').style.display='none'">Cerrar</button>
+                <button type="submit" class="btn-guardar">Guardar Edición</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================== MODAL: AUTENTICACIÓN ==================== -->
+<div id="actionAuthModal" class="modal-overlay">
+    <div class="modal-content">
+        <h4>&#x1F512; Confirmación de Seguridad</h4>
+        <p id="authActionMessage">Para realizar la acción de <strong id="authActionName"></strong>, por favor, ingresa tus credenciales de administrador.</p>
+        <form id="formActionAuth">
+            <input type="hidden" id="authActionType">
+            <input type="hidden" id="authPedidoId">
+            
+            <label for="authEmail">Email de Administrador:</label>
+            <input type="email" id="authEmail" required>
+            
+            <label for="authPassword">Contraseña:</label>
+            <input type="password" id="authPassword" required>
+            
+            <p id="authError"></p>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-cerrar" onclick="document.getElementById('actionAuthModal').style.display='none'">Cerrar</button>
+                <button type="submit" class="btn-guardar" id="authSubmitBtn">Confirmar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==================== AUDIOS DE NOTIFICACIÓN ==================== -->
+<audio id="notificationSoundCliente" src="https://github.com/dt9650329-ops/Chat-administrador-/raw/f67a159f93aed6be1d6f7f02709384111cd84b7e/%E2%9C%A8Monedas%20Cayendo%20__%20Efectos%20De%20Sonidos%20(MP3_160K).mp3" preload="auto"></audio>
+
+<audio id="notificationSoundRepartidor" src="https://github.com/dt9650329-ops/Chat-administrador-/raw/f67a159f93aed6be1d6f7f02709384111cd84b7e/%E2%9C%A8Monedas%20Cayendo%20__%20Efectos%20De%20Sonidos%20(MP3_160K).mp3" preload="auto"></audio>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+  // ==================== IMPORTS DE FIREBASE ====================
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref as dbRef, onValue, push, remove, set, get, update, off } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+  // ==================== CONFIGURACIÓN FIREBASE ====================
+  const firebaseConfig = {
+    apiKey: "AIzaSyAZX7Q5B29Xti4YtV9wXuiREVdkgcclv9U",
+    authDomain: "domicilios-1cd74.firebaseapp.com",
+    databaseURL: "https://domicilios-1cd74-default-rtdb.firebaseio.com",
+    projectId: "domicilios-1cd74",
+    storageBucket: "domicilios-1cd74.firebasestorage.app",
+    messagingSenderId: "771819437001",
+    appId: "1:771819437001:web:b9c8f5e4d3a2c1b0a1b2c3"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const auth = getAuth(app);
+  const storage = getStorage(app); 
+  
+  // ==================== VARIABLES GLOBALES ====================
+  let repartidoresOnline = {}; 
+  let clienteActivo = null; 
+  let ultimoMensajeLeido = {}; 
+  let chatListenerRef = null; 
+  
+  let allPedidos = {}; 
+  let repartidoresInfoHistorial = {};
+  let clientesEnChats = {};
+  
+  window.pedidosPorRepartidorCache = {};
+  let allChatsData = {}; 
+
+  const INACTIVITY_THRESHOLD = 10 * 60 * 1000;
+  let timerIntervals = {};
+  
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let isRecording = false;
+  
+  // Variables para el mapa
+  let map = null;
+  let mapMarkers = {};
+  let mapInitialized = false;
+
+  // 🆕 Variables para limpieza automática de mensajes
+  const MESSAGE_RETENTION_DAYS = 2; // Retener mensajes por 2 días
+  const MESSAGE_RETENTION_MS = MESSAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000; // 2 días en milisegundos
+  const MIN_MESSAGES_TO_KEEP = 10; // Mantener al menos 10 mensajes por seguridad
+  let cleanupExecuted = false; // Bandera para ejecutar limpieza una sola vez
+
+  // ==================== ELEMENTOS DEL DOM ====================
+  const DOMElements = {
+      clientesSection: document.getElementById("clientes"),
+      chatBox: document.getElementById("chatBox"),
+      chatBoxContainer: document.getElementById("chatBoxContainer"),
+      chatBoxHeader: document.getElementById("chatBoxHeader"),
+      listaChats: document.getElementById("listaChats"),
+      mensajeInput: document.getElementById("mensajeInput"),
+      enviarBtn: document.getElementById("enviarBtn"),
+      cerrarChatBtn: document.getElementById("cerrarChatBtn"), 
+      clientesTitle: document.getElementById("clientesTitle"),
+      fotoBtn: document.getElementById("fotoBtn"), 
+      audioBtn: document.getElementById("audioBtn"),
+      fileInputFoto: document.getElementById("fileInputFoto"), 
+      fileInputAudio: document.getElementById("fileInputAudio"), 
+      notificationSoundCliente: document.getElementById("notificationSoundCliente"),
+      notificationSoundRepartidor: document.getElementById("notificationSoundRepartidor"),
+      fileUploadStatus: document.getElementById("file-upload-status"),
+      audioRecordingStatus: document.getElementById("audio-recording-status"),
+      listaRepartidores: document.getElementById("listaRepartidores"),
+      formNuevoPedido: document.getElementById("formNuevoPedido"),
+      repartidorSelect: document.getElementById("repartidorSelect"), 
+      clienteSelect: document.getElementById("clienteSelect"), 
+      pedidoMontoInput: document.getElementById("pedidoMonto"), 
+      listaHistorialPedidos: document.getElementById("listaHistorialPedidos"), 
+      historialPedidosTitle: document.getElementById("historialPedidosTitle"), 
+      loginDiv: document.getElementById('adminLogin'),
+      loginEmailInput: document.getElementById('loginEmail'),
+      loginPasswordInput: document.getElementById('loginPassword'),
+      loginBtn: document.getElementById('loginBtn'),
+      loginErrorP: document.getElementById('loginError'),
+      chatSidebar: document.querySelector('.chat-sidebar'),
+      editarPedidoModal: document.getElementById('editarPedidoModal'),
+      formEditarPedido: document.getElementById('formEditarPedido'),
+      editPedidoIdDisplay: document.getElementById('editPedidoIdDisplay'),
+      editPedidoId: document.getElementById('editPedidoId'),
+      editPedidoDescripcion: document.getElementById('editPedidoDescripcion'),
+      editPedidoDireccion: document.getElementById('editPedidoDireccion'),
+      editPedidoNombreCliente: document.getElementById('editPedidoNombreCliente'),
+      editPedidoTelefono: document.getElementById('editPedidoTelefono'),
+      editPedidoMonto: document.getElementById('editPedidoMonto'),
+      editOriginalMonto: document.getElementById('editOriginalMonto'),
+      actionAuthModal: document.getElementById('actionAuthModal'),
+      formActionAuth: document.getElementById('formActionAuth'),
+      authActionName: document.getElementById('authActionName'),
+      authActionType: document.getElementById('authActionType'),
+      authPedidoId: document.getElementById('authPedidoId'),
+      authEmail: document.getElementById('authEmail'),
+      authPassword: document.getElementById('authPassword'),
+      authError: document.getElementById('authError'),
+      authSubmitBtn: document.getElementById('authSubmitBtn'),
+  };
+
+  // ==================== 🆕 SISTEMA DE LIMPIEZA AUTOMÁTICA DE MENSAJES ====================
+  
+  /**
+   * 🗑️ Función para limpiar mensajes antiguos de todos los chats
+   * Se ejecuta automáticamente al cargar el panel
+   * Borra mensajes mayores a MESSAGE_RETENTION_DAYS días
+   * Mantiene al menos MIN_MESSAGES_TO_KEEP mensajes por seguridad
+   */
+  async function cleanupOldMessages() {
+      if (!auth.currentUser || cleanupExecuted) return;
+      
+      console.log('🗑️ Iniciando limpieza automática de mensajes antiguos...');
+      
+      try {
+          const chatsSnapshot = await get(dbRef(db, 'chats'));
+          
+          if (!chatsSnapshot.exists()) {
+              console.log('✅ No hay chats para limpiar');
+              cleanupExecuted = true;
+              return;
+          }
+          
+          const allChats = chatsSnapshot.val();
+          const currentTime = Date.now();
+          const cutoffTime = currentTime - MESSAGE_RETENTION_MS;
+          
+          let totalChatsProcessed = 0;
+          let totalMessagesDeleted = 0;
+          
+          for (const chatId in allChats) {
+              const messages = allChats[chatId];
+              const messageKeys = Object.keys(messages);
+              
+              // Ordenar mensajes por timestamp (más antiguos primero)
+              const sortedMessages = messageKeys
+                  .map(key => ({ key, ...messages[key] }))
+                  .sort((a, b) => a.timestamp - b.timestamp);
+              
+              // Identificar mensajes a eliminar
+              const messagesToDelete = sortedMessages.filter(msg => 
+                  msg.timestamp < cutoffTime
+              );
+              
+              // Calcular cuántos mensajes conservar
+              const totalMessages = sortedMessages.length;
+              const messagesToKeep = totalMessages - messagesToDelete.length;
+              
+              // Si después de borrar quedarían menos de MIN_MESSAGES_TO_KEEP, ajustar
+              let finalMessagesToDelete = messagesToDelete;
+              if (messagesToKeep < MIN_MESSAGES_TO_KEEP && totalMessages > MIN_MESSAGES_TO_KEEP) {
+                  const excessToDelete = totalMessages - MIN_MESSAGES_TO_KEEP;
+                  finalMessagesToDelete = messagesToDelete.slice(0, excessToDelete);
+              }
+              
+              // Eliminar mensajes antiguos
+              if (finalMessagesToDelete.length > 0) {
+                  for (const msg of finalMessagesToDelete) {
+                      await remove(dbRef(db, `chats/${chatId}/${msg.key}`));
+                      totalMessagesDeleted++;
+                  }
+                  
+                  totalChatsProcessed++;
+                  console.log(`🗑️ Chat ${chatId.substring(0, 8)}: ${finalMessagesToDelete.length} mensajes eliminados`);
+              }
+          }
+          
+          console.log(`✅ Limpieza completada: ${totalMessagesDeleted} mensajes eliminados de ${totalChatsProcessed} chats`);
+          cleanupExecuted = true;
+          
+      } catch (error) {
+          console.error('❌ Error durante la limpieza de mensajes:', error);
+      }
+  }
+
+  // ==================== FUNCIONES DEL MAPA ====================
+  function initMap() {
+      if (mapInitialized) return;
+      
+      // Coordenadas de Armenia, Quindío, Colombia
+      const armeniaCoords = [4.5339, -75.6811];
+      
+      map = L.map('map').setView(armeniaCoords, 13);
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
+      }).addTo(map);
+      
+      mapInitialized = true;
+      console.log('✅ Mapa inicializado correctamente');
+  }
+  
+  // 🆕 FUNCIÓN DE ACTUALIZACIÓN EN TIEMPO REAL DEL MAPA
+  function updateMapMarkers(repartidoresData) {
+      if (!map || !mapInitialized) {
+          console.warn('⚠️ Mapa no inicializado, esperando...');
+          return;
+      }
+      
+      const existingIds = Object.keys(mapMarkers);
+      const currentIds = Object.keys(repartidoresData || {});
+      
+      // Remover marcadores de repartidores que ya no existen
+      existingIds.forEach(id => {
+          if (!currentIds.includes(id)) {
+              map.removeLayer(mapMarkers[id]);
+              delete mapMarkers[id];
+              console.log(`🗑️ Marcador eliminado: ${id}`);
+          }
+      });
+      
+      let onlineCount = 0;
+      let offlineCount = 0;
+      
+      // Actualizar o crear marcadores
+      currentIds.forEach(repId => {
+          const rep = repartidoresData[repId];
+          const isOnline = isRepartidorOnline(rep);
+          
+          if (isOnline) onlineCount++;
+          else offlineCount++;
+          
+          // 🔧 USAR ubicacionActual
+          const ubicacion = rep.ubicacionActual;
+          
+          if (ubicacion && ubicacion.lat && ubicacion.lng) {
+              const lat = parseFloat(ubicacion.lat);
+              const lng = parseFloat(ubicacion.lng);
+              
+              if (!isNaN(lat) && !isNaN(lng)) {
+                  const markerColor = isOnline ? '#27ae60' : '#555555';
+                  const iconHtml = `
+                      <div style="
+                          background-color: ${markerColor};
+                          width: 30px;
+                          height: 30px;
+                          border-radius: 50%;
+                          border: 3px solid #1A1A1A;
+                          box-shadow: 0 0 ${isOnline ? '15' : '5'}px ${markerColor};
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          font-size: 16px;
+                      ">🚶</div>
+                  `;
+                  
+                  const icon = L.divIcon({
+                      html: iconHtml,
+                      className: 'custom-marker',
+                      iconSize: [30, 30],
+                      iconAnchor: [15, 15],
+                      popupAnchor: [0, -15]
+                  });
+                  
+                  if (mapMarkers[repId]) {
+                      // Actualizar posición del marcador existente
+                      mapMarkers[repId].setLatLng([lat, lng]);
+                      mapMarkers[repId].setIcon(icon);
+                      console.log(`🔄 Marcador actualizado: ${rep.nombre || repId} en ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                  } else {
+                      // Crear nuevo marcador
+                      const marker = L.marker([lat, lng], { icon: icon }).addTo(map);
+                      
+                      const nombre = rep.nombre || 'Repartidor';
+                      const telefono = rep.telefono_principal || rep.telefono || 'N/A';
+                      const statusText = isOnline ? '🟢 Online' : '⚫ Offline';
+                      const lastUpdate = rep.lastSeen ? new Date(rep.lastSeen).toLocaleTimeString('es-ES') : 'N/A';
+                      const accuracy = ubicacion.accuracy ? `±${ubicacion.accuracy}m` : 'N/A';
+                      const trackingStatus = rep.trackingActivo ? '✅ Activo' : '❌ Inactivo';
+                      
+                      // Calcular tiempo desde última actualización GPS
+                      const gpsTimestamp = ubicacion.timestamp || rep.lastSeen;
+                      let timeSinceUpdate = 'Desconocido';
+                      if (gpsTimestamp) {
+                          const secondsAgo = Math.floor((Date.now() - gpsTimestamp) / 1000);
+                          if (secondsAgo < 60) {
+                              timeSinceUpdate = `hace ${secondsAgo}s`;
+                          } else if (secondsAgo < 3600) {
+                              timeSinceUpdate = `hace ${Math.floor(secondsAgo / 60)}m`;
+                          } else {
+                              timeSinceUpdate = `hace ${Math.floor(secondsAgo / 3600)}h`;
+                          }
+                      }
+                      
+                      marker.bindPopup(`
+                          <div style="color: #E0E0E0;">
+                              <strong style="color: #FFD700; font-size: 14px;">${nombre}</strong><br>
+                              <span style="font-size: 12px;">📱 ${telefono}</span><br>
+                              <span style="font-size: 12px;">${statusText}</span><br>
+                              <span style="font-size: 11px;">📍 Precisión: ${accuracy}</span><br>
+                              <span style="font-size: 11px;">🔄 Tracking: ${trackingStatus}</span><br>
+                              <span style="font-size: 11px; color: #FFD700;">🕐 GPS: ${timeSinceUpdate}</span><br>
+                              <span style="font-size: 10px; color: #A0A0A0;">Actualizado: ${lastUpdate}</span>
+                              ${rep.ubicacionUrl ? `<br><a href="${rep.ubicacionUrl}" target="_blank" style="color: #5bc0de; font-size: 11px;">📍 Ver en Google Maps</a>` : ''}
+                          </div>
+                      `);
+                      
+                      mapMarkers[repId] = marker;
+                      console.log(`✅ Nuevo marcador creado: ${nombre} en ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                  }
+              } else {
+                  console.warn(`⚠️ Coordenadas inválidas para ${rep.nombre || repId}: ${lat}, ${lng}`);
+              }
+          } else {
+              console.warn(`⚠️ Sin ubicación GPS para ${rep.nombre || repId}`);
+          }
+      });
+      
+      // Actualizar estadísticas
+      document.getElementById('totalReps').textContent = currentIds.length;
+      document.getElementById('onlineReps').textContent = onlineCount;
+      document.getElementById('offlineReps').textContent = offlineCount;
+      
+      // Actualizar timestamp de última actualización del mapa
+      const lastUpdateElement = document.getElementById('lastMapUpdate');
+      if (lastUpdateElement) {
+          const now = new Date();
+          lastUpdateElement.textContent = `Última actualización: ${now.toLocaleTimeString('es-ES')}`;
+      }
+      
+      console.log(`📊 Estadísticas del mapa: Total=${currentIds.length}, Online=${onlineCount}, Offline=${offlineCount}`);
+  }
+  // ==================== FUNCIONES DE UTILIDAD ====================
+  function formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      const pad = (num) => num.toString().padStart(2, '0');
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  
+  function updatePedidoTimer(pedidoId, timestampAceptado) {
+      const timerElement = document.querySelector(`[data-pedido-id="${pedidoId}"] .pedido-timer`);
+      if (timerElement && timestampAceptado) {
+          const elapsed = Date.now() - timestampAceptado;
+          timerElement.textContent = `⏱️ Tiempo: ${formatTime(elapsed)}`;
+      }
+  }
+  
+  function startTimerForPedido(pedidoId, timestampAceptado) {
+      if (timerIntervals[pedidoId]) {
+          clearInterval(timerIntervals[pedidoId]);
+      }
+      
+      if (timestampAceptado) {
+          timerIntervals[pedidoId] = setInterval(() => {
+              updatePedidoTimer(pedidoId, timestampAceptado);
+          }, 1000);
+      }
+  }
+  
+  function stopTimerForPedido(pedidoId) {
+      if (timerIntervals[pedidoId]) {
+          clearInterval(timerIntervals[pedidoId]);
+          delete timerIntervals[pedidoId];
+      }
+  }
+  
+  function normalizeEstadoClass(estado) {
+      if (!estado) return 'pendiente';
+      const estadoLower = estado.toLowerCase().trim();
+      
+      const estadoMap = {
+          'pendiente': 'pendiente',
+          'aceptado': 'aceptado',
+          'esperando pedido': 'esperando',
+          'esperando': 'esperando',
+          'en camino': 'en-camino',
+          'encamino': 'en-camino',
+          'completado': 'completado',
+          'entregado': 'completado',
+          'cancelado': 'cancelado'
+      };
+      
+      return estadoMap[estadoLower] || 'pendiente';
+  }
+  
+  function getEstadoTexto(estado) {
+      if (!estado) return 'Pendiente';
+      const estadoLower = estado.toLowerCase().trim();
+      
+      const textoMap = {
+          'pendiente': 'Pendiente',
+          'aceptado': 'Aceptado',
+          'esperando pedido': 'Esperando Pedido',
+          'esperando': 'Esperando Pedido',
+          'en camino': 'En Camino',
+          'encamino': 'En Camino',
+          'completado': 'Completado',
+          'entregado': 'Completado',
+          'cancelado': 'Cancelado'
+      };
+      
+      return textoMap[estadoLower] || estado;
+  }
+  
+  function formatTimestamp(timestamp, includeTime = true) {
+    if (!timestamp) return "Sin fecha";
+    const numericTimestamp = parseInt(timestamp, 10);
+    if (isNaN(numericTimestamp)) return "Fecha inválida";
+    
+    const date = new Date(numericTimestamp);
+    if (isNaN(date.getTime())) return "Fecha inválida";
+    
+    const options = { 
+        day: '2-digit', month: '2-digit', year: 'numeric'
+    };
+    
+    if (includeTime) {
+        options.hour = '2-digit';
+        options.minute = '2-digit';
+        options.hour12 = true;
+    }
+    
+    return date.toLocaleString('es-ES', options);
+  }
+  
+  function isRepartidorOnline(repInfo) {
+      if (!repInfo || repInfo.online !== true) {
+          return false;
+      }
+      
+      const lastSeen = repInfo.lastSeen;
+      
+      if (!lastSeen) {
+          return repInfo.online === true;
+      }
+      
+      const currentTime = Date.now();
+      return (currentTime - lastSeen) < INACTIVITY_THRESHOLD;
+  }
+  
+  // ==================== AUTENTICACIÓN ====================
+  DOMElements.loginBtn.addEventListener('click', async () => {
+      const email = DOMElements.loginEmailInput.value.trim();
+      const password = DOMElements.loginPasswordInput.value.trim();
+      DOMElements.loginErrorP.textContent = '';
+      
+      if (!email || !password) {
+          DOMElements.loginErrorP.textContent = 'Ingresa email y contraseña.';
+          return;
+      }
+
+      try {
+          await signInWithEmailAndPassword(auth, email, password);
+      } catch (error) {
+          console.error("Error de login:", error.code, error.message);
+          if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+              DOMElements.loginErrorP.textContent = 'Credenciales incorrectas.';
+          } else if (error.code === 'auth/invalid-email') {
+              DOMElements.loginErrorP.textContent = 'El formato del email es incorrecto.';
+          } else {
+              DOMElements.loginErrorP.textContent = 'Error de inicio de sesión.';
+          }
+      }
+  });
+
+  onAuthStateChanged(auth, (user) => {
+      if (user) {
+          DOMElements.loginDiv.style.display = 'none';
+          
+          // 🆕 Ejecutar limpieza automática al autenticarse
+          if (!cleanupExecuted) {
+              setTimeout(() => {
+                  cleanupOldMessages();
+              }, 2000); // Esperar 2 segundos después del login
+          }
+      } else {
+          DOMElements.loginDiv.style.display = 'flex'; 
+      }
+  });
+
+  // ==================== FUNCIONES DE NAVEGACIÓN ====================
+  window.volverAlista = function() {
+      if (chatListenerRef) {
+          off(chatListenerRef);
+          chatListenerRef = null;
+      }
+      
+      clienteActivo = null;
+      DOMElements.clientesSection.classList.remove('active-chat');
+      
+      const prevActiveItem = document.querySelector(`.chat-item.active-client`);
+      if (prevActiveItem) {
+          prevActiveItem.classList.remove('active-client');
+      }
+
+      DOMElements.chatBoxHeader.innerHTML = "<h3>Selecciona un chat para interactuar</h3>";
+      DOMElements.chatBox.innerHTML = "";
+      DOMElements.mensajeInput.disabled = true;
+      DOMElements.enviarBtn.disabled = true;
+      DOMElements.cerrarChatBtn.disabled = true; 
+      DOMElements.fotoBtn.disabled = true; 
+      DOMElements.audioBtn.disabled = true;
+      DOMElements.clientesTitle.style.display = 'block'; 
+
+      if (window.innerWidth <= 768) {
+          DOMElements.chatSidebar.style.display = 'flex'; 
+          DOMElements.chatBoxContainer.style.display = 'none'; 
+      } else {
+          DOMElements.chatSidebar.style.display = 'block'; 
+      }
+  }
+  
+  // ==================== OBTENER DATOS DE CLIENTE/REPARTIDOR ====================
+  async function getClientData(chatId) {
+       const isRepartidor = !chatId.startsWith("cliente_auth_"); 
+       
+       let data = null;
+       let nombre = null;
+       
+       if (isRepartidor) {
+            const repId = chatId;
+            try {
+                const snapshot = await get(dbRef(db, `repartidores_info/${repId}`));
+                if (snapshot.exists()) {
+                    data = snapshot.val();
+                    nombre = data?.nombre || repId.substring(0, 8);
+                }
+            } catch (error) {
+                console.error(`Error al obtener datos de repartidor:`, error);
+            }
+       } else {
+            const fullChatId = chatId;
+            const uidLimpio = fullChatId.replace('cliente_auth_', '');
+            
+            const routesToTry = [
+                `users/${fullChatId}`, 
+                `usuarios/${fullChatId}`, 
+                `usuarios/${uidLimpio}`, 
+                `users/${uidLimpio}`
+            ];
+            
+            for (const route of routesToTry) {
+                 try {
+                    const snapshot = await get(dbRef(db, route));
+                    if (snapshot.exists()) {
+                        data = snapshot.val();
+                        nombre = data?.nombre || data?.email || data?.telefono || data?.tel1;
+                        if (nombre) break; 
+                    }
+                } catch (error) {
+                    // Ignorar errores de rutas que no existen
+                }
+            }
+            
+            if (!nombre) {
+                nombre = `Cliente ${uidLimpio.substring(0, 8)}...`;
+            }
+       }
+       
+       if (nombre && nombre.length > 25 && !nombre.includes('@')) {
+           nombre = nombre.substring(0, 20) + '...';
+       }
+
+       return { 
+           nombreMostrar: nombre, 
+           data: data,
+           isRepartidor: isRepartidor
+       };
+  }
+  
+  // ==================== ACTUALIZAR HEADER DEL CHAT ====================
+  function actualizarChatHeader(chatId, chatData, isRepartidor, nombreMostrar) {
+    const telefono = chatData?.telefono_principal || chatData?.tel1 || chatData?.telefono1 || chatData?.telefono || 'Sin registrar';
+    const direccion = chatData?.direccion_residencia || chatData?.direccion || 'N/A';
+    
+    const titulo = isRepartidor ? `Chat con Repartidor: ${nombreMostrar}` : `Chat con Cliente: ${nombreMostrar}`;
+    
+    let ubicacionHTML = '';
+    let extraClass = '';
+    
+    if (isRepartidor) {
+        const repInfo = repartidoresInfoHistorial[chatId] || chatData;
+        const ubicacionUrl = repInfo?.ubicacionUrl;
+        
+        const isOnline = isRepartidorOnline(repInfo);
+        const onlineStatus = isOnline ? 'Online' : 'Offline';
+        const statusColor = isOnline ? '#27ae60' : '#E0E0E0';
+        
+        let linkContent = 'N/A';
+
+        if (ubicacionUrl) {
+            linkContent = `<a href="${ubicacionUrl}" target="_blank" style="color:#5bc0de; text-decoration: none;">Ver en Mapa</a>`;
+        } else {
+            linkContent = 'Sin ubicación GPS';
+        }
+        
+        ubicacionHTML = `
+            <div>
+                <strong>Estado:</strong> 
+                <span style="color: ${statusColor}; font-weight: bold;">${onlineStatus}</span>
+            </div>
+            <div>
+                <strong>Ubicación:</strong> 
+                ${linkContent}
+            </div>
+        `;
+        extraClass = 'repartidor-compact';
+    }
+    
+    const infoHTML = `
+        <div class="chat-box-info ${extraClass}" id="clientInfoBox">
+            <div><strong>Nombre:</strong> ${nombreMostrar}</div>
+            <div><strong>Teléfono:</strong> ${telefono}</div>
+            ${!isRepartidor ? `<div><strong>Dirección:</strong> ${direccion}</div>` : ''}
+            ${ubicacionHTML}
+        </div>
+    `;
+
+    const backBtn = `
+        <button class="back-btn" id="backBtn" onclick="volverAlista()">&#x2B05;</button>
+    `;
+
+    DOMElements.chatBoxHeader.innerHTML = `
+        <div class="chat-header-row">
+            ${backBtn}
+            <h3>${titulo}</h3>
+        </div>
+        ${infoHTML}
+    `;
+    
+    DOMElements.clientesTitle.style.display = 'none';
+    
+    if (window.innerWidth <= 768) { 
+         DOMElements.chatSidebar.style.display = 'none';
+         DOMElements.chatBoxContainer.style.display = 'flex'; 
+    } else {
+         DOMElements.chatSidebar.style.display = 'block'; 
+         DOMElements.clientesSection.classList.add('active-chat');
+    }
+  }
+
+  // ==================== CREAR ITEM DE CHAT ====================
+  async function createChatItem(chatId, data) {
+       const clientResult = await getClientData(chatId);
+       const isRepartidor = clientResult.isRepartidor;
+       const nombreMostrar = clientResult.nombreMostrar;
+       
+       const tipoChat = isRepartidor ? '&#x1F6B6; Repartidor' : '&#x1F4AC; Cliente';
+       const mensajesArray = Object.values(data);
+       
+       let lastAdminMsgTimestamp = ultimoMensajeLeido[chatId] || 0; 
+       
+       if (lastAdminMsgTimestamp === 0) {
+           mensajesArray.forEach(msg => {
+               if (msg.rol_remitente === "Admin") {
+                   lastAdminMsgTimestamp = Math.max(lastAdminMsgTimestamp, msg.timestamp);
+               }
+           });
+           ultimoMensajeLeido[chatId] = lastAdminMsgTimestamp;
+       }
+       
+       const unreadCount = mensajesArray.filter(msg => 
+           (msg.rol_remitente !== "Admin") && (msg.timestamp > lastAdminMsgTimestamp)
+       ).length;
+       
+       if (unreadCount > 0 && clienteActivo !== chatId) {
+           const audioToPlay = isRepartidor ? DOMElements.notificationSoundRepartidor : DOMElements.notificationSoundCliente;
+           if (audioToPlay && audioToPlay.src && audioToPlay.src.includes('http')) {
+               setTimeout(() => {
+                    audioToPlay.play().catch(e => console.warn("Error de audio (posiblemente auto-play bloqueado):", e));
+               }, 100);
+           }
+       }
+       
+       const item = document.createElement("div");
+       item.classList.add("chat-item");
+       if (clienteActivo === chatId) {
+           item.classList.add("active-client");
+       }
+       item.setAttribute('data-chat-id', chatId);
+       
+       const nameSpan = document.createElement('span');
+       nameSpan.innerHTML = `<strong>${tipoChat}</strong>: ${nombreMostrar}`; 
+       item.appendChild(nameSpan);
+       
+       if (unreadCount > 0) {
+           const badge = document.createElement('span');
+           badge.classList.add('new-messages-badge');
+           badge.textContent = unreadCount;
+           item.appendChild(badge);
+       }
+       
+       item.addEventListener("click", () => {
+           if (!auth.currentUser) return alert("Debes iniciar sesión para ver chats.");
+           window.abrirChat(chatId, clientResult.data, clientResult.isRepartidor, clientResult.nombreMostrar); 
+       });
+       
+       return item;
+  }
+// ==================== LISTENER DE CHATS (CORREGIDO - SIN DUPLICADOS) ====================
+let chatListenerActive = false; // 🆕 Bandera de control
+let lastProcessedChats = {}; // 🆕 Caché de últimos chats procesados
+
+onValue(dbRef(db, "chats"), async snapshot => { 
+  if (!auth.currentUser) return; 
+  
+  // 🆕 Evitar procesamiento simultáneo
+  if (chatListenerActive) {
+      console.log('⚠️ Listener ya procesando, ignorando evento duplicado');
+      return;
+  }
+  
+  chatListenerActive = true;
+  
+  const data = snapshot.val();
+  
+  // 🆕 Detectar si realmente hay cambios
+  const currentChatIds = data ? Object.keys(data).sort().join(',') : '';
+  const lastChatIds = Object.keys(lastProcessedChats).sort().join(',');
+  
+  if (currentChatIds === lastChatIds) {
+      console.log('📋 Sin cambios en chats, omitiendo actualización');
+      chatListenerActive = false;
+      return;
+  }
+  
+  lastProcessedChats = data || {};
+  allChatsData = data || {}; 
+  clientesEnChats = data || {}; 
+  
+  updateClientesDropdown(); 
+  
+  if (Object.keys(repartidoresInfoHistorial).length > 0) {
+      updateRepartidoresList(repartidoresInfoHistorial);
+  }
+  
+  if (!data) {
+    DOMElements.listaChats.innerHTML = "<p>No hay chats activos aún.</p>";
+    if (!DOMElements.clientesSection.classList.contains('active-chat')) {
+       DOMElements.chatBoxHeader.innerHTML = "<h3>Selecciona un chat para interactuar</h3>";
+    }
+    chatListenerActive = false;
+    return;
+  }
+  
+  // 🆕 Filtrar IDs únicos con Set
+  const chatIDs = [...new Set(Object.keys(data))];
+  
+  chatIDs.sort((idA, idB) => {
+      const mensajesA = Object.values(data[idA]);
+      const mensajesB = Object.values(data[idB]);
+      
+      const lastAdminA = ultimoMensajeLeido[idA] || 0;
+      const lastAdminB = ultimoMensajeLeido[idB] || 0;
+
+      const unreadA = mensajesA.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminA).length;
+      const unreadB = mensajesB.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminB).length;
+
+      if (unreadA !== unreadB) {
+          return unreadB - unreadA;
+      }
+      
+      const lastTimestampA = mensajesA.reduce((max, msg) => Math.max(max, msg.timestamp), 0);
+      const lastTimestampB = mensajesB.reduce((max, msg) => Math.max(max, msg.timestamp), 0);
+      
+      return lastTimestampB - lastTimestampA;
+  });
+
+  // 🆕 Limpiar SOLO una vez al inicio
+  DOMElements.listaChats.innerHTML = "";
+  
+  const chatItemPromises = chatIDs.map(chatId => createChatItem(chatId, data[chatId]));
+  const chatItems = await Promise.all(chatItemPromises);
+
+  chatItems.forEach(item => {
+      DOMElements.listaChats.appendChild(item);
+  });
+  
+  console.log(`✅ Lista actualizada: ${chatIDs.length} chats únicos`);
+  chatListenerActive = false;
+});
+
+  // ==================== ACTUALIZAR DROPDOWN DE CLIENTES ====================
+  async function updateClientesDropdown() {
+      if (!auth.currentUser) return;
+
+      DOMElements.clienteSelect.innerHTML = '<option value="">--- Seleccionar Cliente ---</option>';
+      const clientesConChat = Object.keys(clientesEnChats).filter(id => id.startsWith("cliente_auth_"));
+      
+      if (clientesConChat.length === 0) {
+          DOMElements.clienteSelect.innerHTML = '<option value="">--- No hay Clientes en Chats Activos ---</option>';
+          return;
+      }
+
+      const fetchClientDataPromises = clientesConChat.map(id => getClientData(id));
+      const clientResults = await Promise.all(fetchClientDataPromises);
+      
+      clientResults.forEach((result, index) => {
+          const id = clientesConChat[index];
+          const nombreMostrar = result.nombreMostrar;
+          
+          const option = document.createElement('option');
+          option.value = id;
+          option.textContent = nombreMostrar;
+          DOMElements.clienteSelect.appendChild(option);
+      });
+  }
+
+  DOMElements.clienteSelect.addEventListener('change', async () => {
+      const selectedClientId = DOMElements.clienteSelect.value;
+      
+      document.getElementById("pedidoNombreCliente").value = '';
+      document.getElementById("pedidoTelefono").value = '';
+      document.getElementById("pedidoDireccion").value = '';
+      
+      if (!selectedClientId) return;
+      
+      const clientResult = await getClientData(selectedClientId);
+      const clientData = clientResult.data || {};
+      
+      if (clientData) {
+          document.getElementById("pedidoNombreCliente").value = clientData.nombre || clientResult.nombreMostrar || '';
+          document.getElementById("pedidoTelefono").value = clientData.telefono_principal || clientData.tel1 || clientData.telefono1 || clientData.telefono || '';
+          document.getElementById("pedidoDireccion").value = clientData.direccion_residencia || clientData.direccion || '';
+      }
+  });    //
+  // ==================== ABRIR CHAT ====================
+  window.abrirChat = async function(chatId, chatData, isRepartidor, preResueltoNombre = null) {
+    if (!auth.currentUser) return;
+    
+    if (chatListenerRef) {
+        off(chatListenerRef);
+        chatListenerRef = null;
+    }
+    
+    const prevActiveItem = document.querySelector(`.chat-item.active-client`);
+    if (prevActiveItem) {
+        prevActiveItem.classList.remove('active-client');
+    }
+    const currentItem = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+    if (currentItem) {
+        currentItem.classList.add("active-client");
+    }
+    
+    DOMElements.clientesSection.classList.add('active-chat');
+    clienteActivo = chatId;
+    
+    DOMElements.chatBox.innerHTML = ""; 
+    DOMElements.mensajeInput.value = "";
+    DOMElements.mensajeInput.disabled = false;
+    DOMElements.enviarBtn.disabled = false;
+    DOMElements.fotoBtn.disabled = false; 
+    DOMElements.audioBtn.disabled = false;
+    
+    DOMElements.cerrarChatBtn.disabled = isRepartidor; 
+    DOMElements.mensajeInput.focus();
+    
+    let finalChatData = chatData || {};
+    let nombreMostrar = preResueltoNombre; 
+    
+    if (!nombreMostrar || Object.keys(finalChatData).length === 0 || (!finalChatData.telefono && !isRepartidor)) { 
+        const result = await getClientData(chatId);
+        finalChatData = result.data || {};
+        nombreMostrar = result.nombreMostrar;
+        isRepartidor = result.isRepartidor; 
+    }
+    
+    actualizarChatHeader(chatId, finalChatData, isRepartidor, nombreMostrar);
+
+    chatListenerRef = dbRef(db, `chats/${chatId}`);
+    
+    onValue(chatListenerRef, (snapshot) => {
+        if (!auth.currentUser) return; 
+        if (clienteActivo !== chatId) return; 
+
+        DOMElements.chatBox.innerHTML = ""; 
+        const mensajes = snapshot.val();
+        let latestTimestamp = ultimoMensajeLeido[chatId] || 0; 
+        
+        if (mensajes) {
+            Object.keys(mensajes).sort((a, b) => mensajes[a].timestamp - mensajes[b].timestamp).forEach(key => {
+                const data = mensajes[key];
+                
+                let tipo = "admin"; 
+                if (data.rol_remitente === "Cliente") {
+                    tipo = "usuario"; 
+                } else if (data.rol_remitente === "Repartidor") {
+                    tipo = "repartidor-msg"; 
+                }
+
+                const formattedTime = formatTimestamp(data.timestamp);
+                
+                let contentHTML = data.texto;
+                const tipoAdjunto = data.tipo_adjunto || data.tipo || 'texto';
+
+                if (tipoAdjunto === 'foto' || tipoAdjunto === 'image' || tipoAdjunto === 'imagen') {
+                    const imageUrl = data.referencia_adjunto || data.imagenURL || data.texto;
+                    contentHTML = `<a href="${imageUrl}" target="_blank">
+                                       <img src="${imageUrl}" alt="Foto" loading="lazy">
+                                       <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left;">[Ver Imagen]</span>
+                                   </a>`;
+                } else if (tipoAdjunto === 'audio') {
+                    const audioUrl = data.referencia_adjunto || data.audioURL || data.texto;
+                    contentHTML = `<audio controls src="${audioUrl}"></audio>
+                                   <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left;">[Reproducir Audio]</span>`;
+                } else {
+                    contentHTML = data.texto.replace(/\n/g, '<br>');
+                }
+                
+                const div = document.createElement("div");
+                div.className = `mensaje ${tipo}`;
+                
+                div.innerHTML = `
+                    <div class="mensaje-content">${contentHTML}</div>
+                    <div class="chat-time">${formattedTime}</div>
+                `;
+                
+                DOMElements.chatBox.appendChild(div);
+                if (data.rol_remitente === "Admin") {
+                    latestTimestamp = Math.max(latestTimestamp, data.timestamp);
+                }
+            });
+        } else {
+             DOMElements.chatBox.innerHTML = "<p>El chat está vacío o fue eliminado. Envía un mensaje para comenzar.</p>";
+        }
+        
+        DOMElements.chatBox.scrollTop = DOMElements.chatBox.scrollHeight;
+        
+        if (latestTimestamp > 0) {
+            ultimoMensajeLeido[clienteActivo] = latestTimestamp;
+            const badge = document.querySelector(`.chat-item[data-chat-id="${chatId}"] .new-messages-badge`);
+            if (badge) badge.remove();
+        }
+        
+        if (isRepartidor) {
+             getClientData(clienteActivo).then((result) => {
+                const newData = result.data || {};
+                
+                if (newData.ubicacionUrl !== finalChatData.ubicacionUrl || isRepartidorOnline(newData) !== isRepartidorOnline(finalChatData)) {
+                     finalChatData = newData; 
+                     actualizarChatHeader(clienteActivo, finalChatData, isRepartidor, result.nombreMostrar);
+                }
+             }).catch(e => console.error("Error al actualizar info de repartidor:", e));
+        }
+        
+    }, (error) => {
+        console.error("Error al cargar mensajes del chat:", error);
+        DOMElements.chatBox.innerHTML = `<p style="color:red;">Error al cargar el chat: ${error.name}. Revisa las reglas de Firebase.</p>`;
+    });
+  }
+
+  window.abrirChat = window.abrirChat;
+  window.volverAlista = window.volverAlista;
+
+  // ==================== SUBIR Y ENVIAR ARCHIVOS ====================
+  async function uploadAndSend(file, tipo) {
+      if (!file || !clienteActivo || !auth.currentUser) return;
+      
+      const filePath = `chats/${clienteActivo}/${tipo}/${Date.now()}_${file.name}`; 
+      const fileStorageRef = storageRef(storage, filePath);
+      
+      const originalText = DOMElements.enviarBtn.textContent;
+      DOMElements.enviarBtn.textContent = `Subiendo ${tipo}...`;
+      DOMElements.enviarBtn.disabled = true;
+      DOMElements.fotoBtn.disabled = true;
+      DOMElements.audioBtn.disabled = true;
+      DOMElements.fileUploadStatus.style.display = 'block';
+      DOMElements.fileUploadStatus.textContent = 'Subiendo archivo...';
+
+      try {
+          const uploadTask = uploadBytesResumable(fileStorageRef, file);
+          
+          uploadTask.on('state_changed', 
+              (snapshot) => {
+                  const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                  DOMElements.fileUploadStatus.textContent = `Subiendo... ${progress.toFixed(0)}%`;
+              },
+              (error) => {
+                  console.error(`Error al subir ${tipo}:`, error);
+                  throw error;
+              }
+          );
+          
+          await uploadTask;
+          const url = await getDownloadURL(fileStorageRef);
+          
+          await push(dbRef(db, `chats/${clienteActivo}`), {
+            remitente: "admin", 
+            texto: tipo === 'foto' ? '📷 Imagen' : '🎤 Audio',
+            timestamp: Date.now(), 
+            rol_remitente: "Admin",
+            tipo_adjunto: tipo,
+            referencia_adjunto: url
+          });
+
+          ultimoMensajeLeido[clienteActivo] = Date.now();
+          DOMElements.fileUploadStatus.textContent = '✅ Archivo enviado exitosamente';
+
+      } catch (error) {
+          console.error(`Error al subir ${tipo}:`, error);
+          alert(`Error al enviar ${tipo}. Revisa las reglas de Storage. Detalle: ${error.message}`);
+          DOMElements.fileUploadStatus.textContent = `❌ Error: ${error.message}`;
+      } finally {
+          setTimeout(() => {
+              DOMElements.enviarBtn.textContent = originalText;
+              DOMElements.enviarBtn.disabled = false;
+              DOMElements.fotoBtn.disabled = false;
+              DOMElements.audioBtn.disabled = false;
+              DOMElements.fileUploadStatus.style.display = 'none';
+          }, 2000);
+          DOMElements.chatBox.scrollTop = DOMElements.chatBox.scrollHeight;
+      }
+  }
+  
+  // ==================== GRABAR AUDIO ====================
+  window.toggleGrabarAudio = async function() {
+      const btnAudio = DOMElements.audioBtn;
+      const btnFoto = DOMElements.fotoBtn;
+      const statusDiv = DOMElements.audioRecordingStatus;
+      
+      if (!isRecording) {
+          try {
+              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              
+              mediaRecorder = new MediaRecorder(stream);
+              audioChunks = [];
+              
+              mediaRecorder.ondataavailable = (event) => {
+                  audioChunks.push(event.data);
+              };
+              
+              mediaRecorder.onstop = async () => {
+                  const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                  const audioFile = new File([audioBlob], `audio_${Date.now()}.webm`, { type: 'audio/webm' });
+                  
+                  stream.getTracks().forEach(track => track.stop());
+                  
+                  statusDiv.style.display = 'none';
+                  btnAudio.classList.remove('recording-active');
+                  btnAudio.innerHTML = '&#x1F3A4;';
+                  btnAudio.title = 'Grabar Audio';
+                  btnFoto.disabled = false;
+                  
+                  await uploadAndSend(audioFile, 'audio');
+              };
+              
+              mediaRecorder.start();
+              isRecording = true;
+              
+              btnAudio.classList.add('recording-active');
+              btnAudio.innerHTML = '⏹️';
+              btnAudio.title = 'Detener Grabación';
+              btnFoto.disabled = true;
+              statusDiv.style.display = 'block';
+              statusDiv.textContent = '🔴 Grabando audio...';
+              
+          } catch (error) {
+              alert('Error al acceder al micrófono: ' + error.message);
+              console.error('Error de micrófono:', error);
+          }
+      } else {
+          if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+              mediaRecorder.stop();
+              isRecording = false;
+          }
+      }
+  }
+
+  // ==================== ENVIAR MENSAJE ====================
+  function enviarMensajeAdmin(tipo = 'texto') {
+    if (!auth.currentUser) return; 
+    
+    const texto = DOMElements.mensajeInput.value.trim();
+    
+    if (!texto || !clienteActivo) return;
+
+    push(dbRef(db, `chats/${clienteActivo}`), {
+      remitente: "admin", 
+      texto: texto,
+      timestamp: Date.now(), 
+      rol_remitente: "Admin",
+      tipo: tipo 
+    }).then(() => {
+        ultimoMensajeLeido[clienteActivo] = Date.now();
+    }).catch(error => console.error("Error al enviar mensaje:", error));
+    
+    DOMElements.mensajeInput.value = "";
+    DOMElements.chatBox.scrollTop = DOMElements.chatBox.scrollHeight; 
+  }
+  
+  // ==================== EVENT LISTENERS DE CHAT ====================
+  DOMElements.fotoBtn.addEventListener('click', () => {
+      if (!auth.currentUser || !clienteActivo || DOMElements.fotoBtn.disabled) return;
+      DOMElements.fileInputFoto.click();
+  });
+
+  DOMElements.audioBtn.addEventListener('click', () => {
+      if (!auth.currentUser || !clienteActivo || DOMElements.audioBtn.disabled) return;
+      window.toggleGrabarAudio();
+  });
+  
+  DOMElements.fileInputFoto.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+          uploadAndSend(file, 'foto');
+      }
+      e.target.value = '';
+  });
+  
+  DOMElements.cerrarChatBtn.addEventListener('click', async () => { 
+    if (!auth.currentUser) return; 
+    const clientResult = await getClientData(clienteActivo);
+    if (clientResult.isRepartidor) {
+        alert("Esta función solo se puede usar para eliminar chats de Clientes. Los chats de repartidores se mantienen por seguridad.");
+        return; 
+    }
+
+    const nombreParaAlerta = clientResult.nombreMostrar;
+
+    if (confirm(`¿Estás seguro de que quieres ELIMINAR PERMANENTEMENTE el chat con ${nombreParaAlerta}? El historial se perderá.`)) {
+        const chatRef = dbRef(db, `chats/${clienteActivo}`);
+        
+        get(chatRef).then((snapshot) => {
+            if (snapshot.exists()) {
+                
+                remove(chatRef).then(() => {
+                    alert(`Chat con ${nombreParaAlerta} eliminado PERMANENTEMENTE.`);
+                    volverAlista();
+                }).catch(error => console.error("Error al eliminar el chat:", error));
+                
+            } else {
+                 alert("Error: El chat ya no existe o está vacío.");
+            }
+        }).catch(error => console.error("Error al obtener chat para eliminar:", error));
+    }
+  });
+
+  DOMElements.enviarBtn.addEventListener("click", () => enviarMensajeAdmin('texto'));
+  DOMElements.mensajeInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { 
+        e.preventDefault();
+        enviarMensajeAdmin('texto'); 
+    }
+  });
+
+  // ==================== ACTUALIZAR LISTA DE REPARTIDORES ====================
+  function updateRepartidoresList(data) {
+    DOMElements.listaRepartidores.innerHTML = "";
+    DOMElements.repartidorSelect.innerHTML = '<option value="">--- Selecciona un Repartidor ---</option>';
+    
+    repartidoresOnline = {}; 
+    
+    if (!data) {
+      DOMElements.listaRepartidores.innerHTML = "<p>No hay repartidores registrados.</p>";
+      return;
+    }
+    
+    const sortedRepartidoresIds = Object.keys(data).sort((idA, idB) => {
+        const repA = data[idA];
+        const repB = data[idB];
+        const onlineA = isRepartidorOnline(repA) ? 1 : 0; 
+        const onlineB = isRepartidorOnline(repB) ? 1 : 0;
+        
+        if (onlineA !== onlineB) {
+            return onlineB - onlineA; 
+        }
+        return (repA?.nombre || '').localeCompare(repB?.nombre || '');
+    });
+
+    sortedRepartidoresIds.forEach(id => {
+        const rep = data[id];
+        const isRepartidorChat = true; 
+        const isOnline = isRepartidorOnline(rep);
+        const statusColor = isOnline ? '#27ae60' : '#E0E0E0'; 
+        const statusText = isOnline ? 'Online' : 'Offline';
+        const nombreMostrar = rep?.nombre || id.substring(0, 8);
+        
+        let unreadCount = 0;
+        if (allChatsData[id]) {
+            const mensajesArray = Object.values(allChatsData[id]);
+            const lastAdminMsgTimestamp = ultimoMensajeLeido[id] || 0;
+            
+            unreadCount = mensajesArray.filter(msg => 
+                (msg.rol_remitente !== "Admin") && (msg.timestamp > lastAdminMsgTimestamp)
+            ).length;
+        }
+        const messageHint = unreadCount > 0 ? `<span class="message-hint" title="${unreadCount} mensajes sin leer">&#x1F4AC;</span>` : '';
+        
+        const item = document.createElement("div");
+        item.classList.add("chat-item"); 
+        
+        item.addEventListener("click", () => {
+             if (!auth.currentUser) return alert("Debes iniciar sesión para ver chats.");
+            document.querySelector('[data-tab="clientes"]').click();
+            window.abrirChat(id, rep, isRepartidorChat, nombreMostrar); 
+        });
+
+        item.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <div class="historial-item-container" style="flex-grow: 1;">
+                    <strong>${nombreMostrar}</strong>
+                    <span style="font-size: 12px; color: #A0A0A0;">${rep?.telefono_principal || rep?.telefono || 'Sin Teléfono'}</span>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    ${messageHint}
+                    <span style="font-size: 12px; font-weight: bold; color: ${statusColor};">${statusText}</span>
+                </div>
+            </div>
+        `;
+        DOMElements.listaRepartidores.appendChild(item);
+        
+        if (isOnline) { 
+            repartidoresOnline[id] = rep; 
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = nombreMostrar;
+            DOMElements.repartidorSelect.appendChild(option);
+        }
+    });
+    
+    if (DOMElements.repartidorSelect.options.length === 1 && !DOMElements.repartidorSelect.options[0].value) {
+        DOMElements.repartidorSelect.options[0].textContent = "No hay repartidores Online";
+    }
+  }
+
+  // ==================== LISTENER DE REPARTIDORES INFO CON ACTUALIZACIÓN DE MAPA ====================
+  onValue(dbRef(db, "repartidores_info"), snapshot => {
+    if (!auth.currentUser) return; 
+    
+    const data = snapshot.val();
+    repartidoresInfoHistorial = data || {}; 
+    
+    updateRepartidoresList(data);
+    
+    // 🆕 ACTUALIZAR MAPA EN TIEMPO REAL - Se ejecuta cada vez que Firebase detecta cambios
+    // Esto incluye las actualizaciones de GPS cada 10 segundos del repartidor
+    if (mapInitialized) {
+        updateMapMarkers(data);
+        console.log('🔄 Mapa actualizado automáticamente - GPS recibido de Firebase');
+    } else {
+        console.log('⚠️ Mapa aún no inicializado, esperando activación de pestaña');
+    }
+  });
+
+  // ==================== NAVEGACIÓN ENTRE TABS ====================
+  const tabs = document.querySelectorAll('.tab-btn');
+  const sections = document.querySelectorAll('section');
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+       if (!auth.currentUser) return alert("Debes iniciar sesión para usar el panel.");
+
+      tabs.forEach(b => b.classList.remove('active'));
+      sections.forEach(s => s.classList.remove('active'));
+      const targetTab = btn.dataset.tab;
+      btn.classList.add('active');
+      document.getElementById(targetTab).classList.add('active');
+      
+      if (targetTab !== 'clientes') {
+          window.volverAlista(); 
+      } else {
+          if (clienteActivo) {
+               getClientData(clienteActivo).then(clientResult => {
+                    const chatData = clientResult.data || {};
+                    const isRep = clientResult.isRepartidor;
+                    const nombre = clientResult.nombreMostrar;
+                    window.abrirChat(clienteActivo, chatData, isRep, nombre); 
+               }).catch(e => {
+                    console.error("Error al reabrir chat:", e);
+                    window.abrirChat(clienteActivo, {}, false, null);
+               });
+           } else {
+               window.volverAlista();
+           }
+      }
+      
+      if (targetTab === 'historialPedidos') {
+          window.mostrarListaRepartidoresHistorial();
+      }
+      
+      // 🆕 INICIALIZAR MAPA CUANDO SE ACCEDE A LA PESTAÑA
+      if (targetTab === 'mapaRepartidores') {
+          if (!mapInitialized) {
+              console.log('🗺️ Inicializando mapa...');
+              initMap();
+              updateMapMarkers(repartidoresInfoHistorial);
+          } else {
+              console.log('🗺️ Mapa ya inicializado, actualizando marcadores...');
+              updateMapMarkers(repartidoresInfoHistorial);
+          }
+      }
+    });
+  });
+
+  // ==================== INICIALIZACIÓN AL CARGAR ====================
+  window.addEventListener('load', function() {
+       window.volverAlista();
+       console.log('✅ Panel de administrador cargado correctamente');
+       console.log(`🗑️ Sistema de limpieza automática activado: mensajes >  ${MESSAGE_RETENTION_DAYS} días serán eliminados`);
+  });
+
+  // ==================== CÓDIGO DE PEDIDOS Y FORMULARIOS ====================
+  
+  DOMElements.formNuevoPedido.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!auth.currentUser) {
+          alert("Debes iniciar sesión para enviar pedidos.");
+          return;
+      }
+      
+      const repartidorId = DOMElements.repartidorSelect.value;
+      const descripcion = document.getElementById("pedidoDescripcion").value.trim();
+      const direccion = document.getElementById("pedidoDireccion").value.trim();
+      const nombreCliente = document.getElementById("pedidoNombreCliente").value.trim() || 'Cliente Desconocido';
+      const telefono = document.getElementById("pedidoTelefono").value.trim();
+      const monto = parseFloat(document.getElementById("pedidoMonto").value);
+      
+      const clienteIdAsignado = DOMElements.clienteSelect.value || null; 
+
+      if (!repartidorId) {
+           alert("Por favor, selecciona un repartidor para asignar el pedido.");
+           return;
+      }
+      
+      if (isNaN(monto) || monto <= 0) {
+          alert("Por favor, ingrese un monto total válido.");
+          return;
+      }
+      
+      const repartidorInfo = repartidoresOnline[repartidorId];
+      if (!repartidorInfo) {
+          alert("El repartidor seleccionado no está online o no existe su información.");
+          return;
+      }
+      
+      if (!isRepartidorOnline(repartidorInfo)) {
+           alert("El repartidor seleccionado ya no está activo. Por favor, actualiza la lista o selecciona otro.");
+           updateRepartidoresList(repartidoresInfoHistorial);
+           return; 
+      }
+
+      const nuevoPedido = {
+          descripcion: descripcion,
+          direccionCliente: direccion,
+          nombreCliente: nombreCliente,
+          telefonoCliente: telefono,
+          montoTotal: monto,
+          estado: 'Pendiente', 
+          timestampCreacion: Date.now(),
+          repartidorIdAsignado: repartidorId, 
+          repartidorNombre: repartidorInfo.nombre,
+          clienteIdAsignado: clienteIdAsignado, 
+      };
+      
+      try {
+          const newPedidoRef = await push(dbRef(db, `pedidos_pendientes`), nuevoPedido);
+          const pedidoKey = newPedidoRef.key;
+          
+          await set(dbRef(db, `pedidos_historial/${pedidoKey}`), {
+              ...nuevoPedido,
+              id: pedidoKey,
+              estadoHistorial: 'Pendiente', 
+              timestampAsignacion: Date.now()
+          });
+          
+          if (clienteIdAsignado) {
+              await update(dbRef(db, `users/${clienteIdAsignado}`), {
+                  pedidoActivoId: pedidoKey, 
+                  tienePedidoAsignado: true 
+              });
+          }
+
+          alert(`Pedido enviado y asignado a ${repartidorInfo.nombre}. Guardado en el historial.`);
+          DOMElements.formNuevoPedido.reset();
+      } catch (error) {
+           console.error("Error al enviar el pedido:", error);
+           alert("Error al enviar el pedido.");
+      }
+  });
+
+  document.querySelectorAll('.monto-rapido-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+          const monto = btn.getAttribute('data-monto');
+          document.getElementById("pedidoMonto").value = monto;
+      });
+  });
+
+  // ==================== LISTENERS DE PEDIDOS ====================
+  onValue(dbRef(db, "pedidos_historial"), snapshot => {
+      if (!auth.currentUser) return; 
+      
+      const data = snapshot.val();
+      allPedidos = data || {}; 
+      
+      const historialSection = document.getElementById('historialPedidos');
+      if (historialSection.classList.contains('active')) {
+          window.mostrarListaRepartidoresHistorial();
+      }
+  });
+  
+  onValue(dbRef(db, "pedidos_pendientes"), snapshot => {
+      if (!auth.currentUser) return;
+      
+      const pendingData = snapshot.val();
+      
+      if (pendingData) {
+          Object.keys(pendingData).forEach(async pedidoId => {
+              const pedido = pendingData[pedidoId];
+              
+              const historialSnapshot = await get(dbRef(db, `pedidos_historial/${pedidoId}`));
+              if (historialSnapshot.exists()) {
+                  await update(dbRef(db, `pedidos_historial/${pedidoId}`), {
+                      estado: pedido.estado,
+                      estadoHistorial: pedido.estado,
+                      timestampAceptado: pedido.timestampAceptado || null
+                  });
+              }
+          });
+      }
+      
+      const historialSection = document.getElementById('historialPedidos');
+      if (historialSection.classList.contains('active')) {
+          setTimeout(() => {
+              const backBtn = document.querySelector('.back-historial-btn');
+              if (backBtn && backBtn.onclick) {
+                  backBtn.click();
+                  setTimeout(() => history.back(), 100);
+              }
+          }, 300);
+      }
+  });
+
+  // ==================== MOSTRAR HISTORIAL - LISTA DE REPARTIDORES ====================
+  window.mostrarListaRepartidoresHistorial = function() {
+      DOMElements.listaHistorialPedidos.innerHTML = "";
+      DOMElements.historialPedidosTitle.innerHTML = '&#x1F4DA; Historial de Pedidos Asignados';
+      
+      Object.keys(timerIntervals).forEach(pedidoId => {
+          stopTimerForPedido(pedidoId);
+      });
+      
+      if (Object.keys(allPedidos).length === 0) {
+          DOMElements.listaHistorialPedidos.innerHTML = "<p>No hay historial de pedidos aún.</p>";
+          return;
+      }
+      
+      const pedidosPorRepartidorTemp = Object.keys(allPedidos).reduce((acc, key) => {
+          const pedido = allPedidos[key];
+          const repId = pedido.repartidorIdAsignado || 'id_desconocido';
+          if (!acc[repId]) {
+              acc[repId] = {
+                  nombre: pedido.repartidorNombre || repartidoresInfoHistorial[repId]?.nombre || 'Repartidor Desconocido',
+                  pedidos: []
+              };
+          }
+          acc[repId].pedidos.push({...pedido, id: key});
+          return acc;
+      }, {});
+      
+      window.pedidosPorRepartidorCache = pedidosPorRepartidorTemp; 
+
+      const repartidoresConPedidos = Object.keys(window.pedidosPorRepartidorCache).filter(id => window.pedidosPorRepartidorCache[id].pedidos.length > 0);
+
+      const sortedRepartidores = repartidoresConPedidos.sort((a, b) => {
+          const repA = repartidoresInfoHistorial[a];
+          const repB = repartidoresInfoHistorial[b];
+          if (repA && repB) {
+             const onlineA = isRepartidorOnline(repA) ? 1 : 0; 
+             const onlineB = isRepartidorOnline(repB) ? 1 : 0;
+             if (onlineA !== onlineB) return onlineB - onlineA; 
+          }
+          return window.pedidosPorRepartidorCache[a].nombre.localeCompare(window.pedidosPorRepartidorCache[b].nombre);
+      });
+      
+      sortedRepartidores.forEach(repId => {
+          const repData = window.pedidosPorRepartidorCache[repId];
+          const repInfo = repartidoresInfoHistorial[repId];
+          const isOnline = isRepartidorOnline(repInfo);
+          const statusColor = isOnline ? '#27ae60' : '#E0E0E0';
+          const statusText = isOnline ? 'Online' : 'Offline';
+
+          const item = document.createElement("div");
+          item.classList.add("historial-step-item");
+          item.innerHTML = `
+              <div class="historial-item-container">
+                  <strong>&#x1F6B6; ${repData.nombre}</strong>
+                  <span>${repData.pedidos.length} pedidos asignados</span>
+              </div>
+              <span style="font-weight: bold; color: ${statusColor};">${statusText}</span>
+          `;
+          
+          item.addEventListener("click", () => window.mostrarHistorialPorFecha(repId, repData));
+          DOMElements.listaHistorialPedidos.appendChild(item);
+      });
+  }
+  
+  // ==================== MOSTRAR HISTORIAL - POR FECHA ====================
+  window.mostrarHistorialPorFecha = function(repartidorId, repData) {
+      DOMElements.listaHistorialPedidos.innerHTML = '';
+      
+      Object.keys(timerIntervals).forEach(pedidoId => {
+          stopTimerForPedido(pedidoId);
+      });
+      
+      const pedidosPorFecha = repData.pedidos.reduce((acc, pedido) => {
+          const timestamp = pedido.timestampAsignacion || pedido.timestampCreacion;
+          const dateOnly = formatTimestamp(timestamp, false); 
+          
+          if (!acc[dateOnly]) {
+              acc[dateOnly] = [];
+          }
+          acc[dateOnly].push(pedido);
+          return acc;
+      }, {});
+      
+      const sortedDates = Object.keys(pedidosPorFecha).sort((a, b) => {
+           const toComparableDate = (dateStr) => {
+               const [day, month, year] = dateStr.split('/');
+               return new Date(`${year}-${month}-${day}`).getTime();
+           };
+           const timeA = toComparableDate(a);
+           const timeB = toComparableDate(b);
+           if (isNaN(timeA) || isNaN(timeB)) return 0; 
+           return timeB - timeA;
+      });
+
+      DOMElements.historialPedidosTitle.innerHTML = `
+          <button class="back-historial-btn" onclick="mostrarListaRepartidoresHistorial()">&#x2B05;</button>
+          Historial de ${repData.nombre}
+      `;
+
+      if (sortedDates.length === 0) {
+          DOMElements.listaHistorialPedidos.innerHTML = `<p style="padding: 10px;">No hay pedidos registrados para este repartidor en el historial.</p>`;
+      } else {
+          sortedDates.forEach(date => {
+              const item = document.createElement("div");
+              item.classList.add("historial-step-item");
+              const pedidosDelDia = pedidosPorFecha[date];
+              
+              const totalPedidos = pedidosDelDia.length;
+              const totalMonto = pedidosDelDia.reduce((sum, p) => sum + (p.montoTotal || 0), 0);
+              
+              item.innerHTML = `
+                  <div class="historial-item-container">
+                      <strong>&#x1F4C5; ${date}</strong>
+                      <span>${totalPedidos} pedidos | Total: $${totalMonto.toLocaleString('es-ES')}</span>
+                  </div>
+              `;
+              
+              item.addEventListener("click", () => window.mostrarDetallePedidos(repartidorId, repData.nombre, date, pedidosDelDia));
+              DOMElements.listaHistorialPedidos.appendChild(item);
+          });
+      }
+  }
+
+  // ==================== MOSTRAR DETALLE DE PEDIDOS ====================
+  window.mostrarDetallePedidos = function(repartidorId, repartidorNombre, fecha, pedidosDelDia) {
+      DOMElements.listaHistorialPedidos.innerHTML = '';
+      
+      Object.keys(timerIntervals).forEach(pedidoId => {
+          stopTimerForPedido(pedidoId);
+      });
+      
+      DOMElements.historialPedidosTitle.innerHTML = `
+          <button class="back-historial-btn" onclick="mostrarHistorialPorFecha('${repartidorId}', window.pedidosPorRepartidorCache['${repartidorId}'])">&#x2B05;</button>
+          Pedidos de ${repartidorNombre} el ${fecha}
+      `;
+      
+      pedidosDelDia.sort((a, b) => (b.timestampAsignacion || b.timestampCreacion) - (a.timestampAsignacion || a.timestampCreacion));
+      
+      pedidosDelDia.forEach(pedido => {
+          const timestamp = pedido.timestampAsignacion || pedido.timestampCreacion;
+          const dateAsignacion = formatTimestamp(timestamp, true); 
+          
+          const estado = pedido.estado || pedido.estadoHistorial || 'Pendiente';
+          const estadoClass = normalizeEstadoClass(estado);
+          const estadoTexto = getEstadoTexto(estado);
+          
+          const nombreCliente = pedido.nombreCliente || 'Cliente Desconocido';
+          const descripcion = pedido.descripcion || 'Sin descripción';
+          const montoTotal = pedido.montoTotal || 0;
+
+          const item = document.createElement("div");
+          item.classList.add("pedido-historial-item");
+          item.setAttribute('data-pedido-id', pedido.id);
+          
+          const pedidoId = pedido.id;
+          
+          let actionButtonsHTML = '';
+          
+          if (estadoClass !== 'completado' && estadoClass !== 'cancelado') {
+              actionButtonsHTML += `<button class="pedido-action-btn btn-editar" onclick="confirmAction('editar', '${pedidoId}')">&#x1F58A; Editar</button>`;
+          }
+          
+          if (estadoClass === 'cancelado') {
+              actionButtonsHTML += `<button class="pedido-action-btn btn-reenviar" onclick="window.reenviarPedido('${pedidoId}')">&#x1F504; Reenviar Pedido</button>`;
+          }
+          
+          if (estadoClass !== 'cancelado' && estadoClass !== 'completado') {
+              actionButtonsHTML += `<button class="pedido-action-btn btn-cancelar" onclick="confirmAction('cancelar', '${pedidoId}')">&#x274C; Cancelar Pedido</button>`;
+          }
+          
+          const actionContainer = actionButtonsHTML ? `<div class="pedido-action-container">${actionButtonsHTML}</div>` : '';
+          
+          let estadoIndicatorHTML = '';
+          let timerHTML = '';
+          
+          if (estadoClass !== 'completado' && estadoClass !== 'cancelado') {
+              estadoIndicatorHTML = `<span class="estado-indicator ${estadoClass}"></span>`;
+          }
+          
+          if (pedido.timestampAceptado && estadoClass !== 'completado' && estadoClass !== 'cancelado') {
+              const elapsed = Date.now() - pedido.timestampAceptado;
+              timerHTML = `<span class="pedido-timer">⏱️ Tiempo: ${formatTime(elapsed)}</span>`;
+              
+              startTimerForPedido(pedidoId, pedido.timestampAceptado);
+          }
+          
+          item.innerHTML = `
+              <span class="estado-badge ${estadoClass}">${estadoTexto}</span>
+              <strong>${estadoIndicatorHTML}${nombreCliente} ($${(typeof montoTotal === 'number' ? montoTotal.toLocaleString('es-ES') : montoTotal)})</strong>
+              ${timerHTML}
+              <div class="detalle-linea">
+                  <span>Teléfono:</span>
+                  <span class="valor">${pedido.telefonoCliente || 'N/A'}</span>
+              </div>
+              <div class="detalle-linea">
+                  <span>Dirección:</span>
+                  <span class="valor">${pedido.direccionCliente || 'N/A'}</span>
+              </div>
+              <div class="detalle-linea">
+                  <span>Descripción:</span>
+                  <span class="valor">${descripcion}</span>
+              </div>
+              <div class="detalle-linea" style="margin-top: 5px;">
+                  <span>Hora de Asignación:</span>
+                  <span style="font-size: 11px; color: #A0A0A0;">${dateAsignacion}</span>
+              </div>
+              ${actionContainer}
+          `; 
+          DOMElements.listaHistorialPedidos.appendChild(item);
+      });
+  }
+  
+  // ==================== CONFIRMAR ACCIÓN (EDITAR/CANCELAR) ====================
+  window.confirmAction = function(actionType, pedidoId) {
+       if (!auth.currentUser) return alert("Debes iniciar sesión para realizar esta acción.");
+
+       DOMElements.authActionName.textContent = actionType === 'editar' ? 'Editar Pedido' : 'Cancelar Pedido';
+       DOMElements.authActionType.value = actionType;
+       DOMElements.authPedidoId.value = pedidoId;
+       DOMElements.authError.textContent = '';
+       
+       if (auth.currentUser.email) {
+           DOMElements.authEmail.value = auth.currentUser.email;
+       }
+       DOMElements.authPassword.value = '';
+
+       DOMElements.actionAuthModal.style.display = 'flex';
+  }
+  
+  // ==================== AUTENTICACIÓN PARA ACCIONES ====================
+  DOMElements.formActionAuth.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = DOMElements.authEmail.value.trim();
+      const password = DOMElements.authPassword.value.trim();
+      const actionType = DOMElements.authActionType.value;
+      const pedidoId = DOMElements.authPedidoId.value;
+      
+      if (!email || !password || !pedidoId) {
+          DOMElements.authError.textContent = 'Faltan datos de autenticación o del pedido.';
+          return;
+      }
+      
+      DOMElements.authError.textContent = 'Verificando credenciales...';
+      DOMElements.authSubmitBtn.disabled = true;
+
+      try {
+          const credential = EmailAuthProvider.credential(email, password);
+          await reauthenticateWithCredential(auth.currentUser, credential);
+          
+          DOMElements.authError.textContent = 'Credenciales verificadas. Procesando...';
+          DOMElements.actionAuthModal.style.display = 'none';
+
+          const pedidoSnapshot = await get(dbRef(db, `pedidos_historial/${pedidoId}`));
+          if (!pedidoSnapshot.exists()) {
+               return alert("Error: El pedido no se encontró.");
+          }
+          const pedidoObj = pedidoSnapshot.val();
+
+          if (actionType === 'editar') {
+              window.openEditPedidoModal(pedidoObj);
+          } else if (actionType === 'cancelar') {
+              window.cancelarPedido(pedidoId);
+          }
+          
+      } catch (error) {
+          console.error("Error de autenticación para la acción:", error.code, error.message);
+          if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+              DOMElements.authError.textContent = 'Contraseña incorrecta.';
+          } else if (error.code === 'auth/user-mismatch' || error.code === 'auth/user-not-found') {
+               DOMElements.authError.textContent = 'El email de administrador no es correcto.';
+          } else {
+              DOMElements.authError.textContent = 'Error de seguridad. Intenta nuevamente.';
+          }
+      } finally {
+          DOMElements.authSubmitBtn.disabled = false;
+      }
+  });
+
+  // ==================== ABRIR MODAL DE EDICIÓN ====================
+  window.openEditPedidoModal = function(pedidoObj) {
+      if (!auth.currentUser) return;
+
+      DOMElements.editPedidoIdDisplay.textContent = `#${pedidoObj.id.substring(0, 8)}...`;
+      DOMElements.editPedidoId.value = pedidoObj.id;
+      DOMElements.editPedidoDescripcion.value = pedidoObj.descripcion || '';
+      DOMElements.editPedidoDireccion.value = pedidoObj.direccionCliente || '';
+      DOMElements.editPedidoNombreCliente.value = pedidoObj.nombreCliente || '';
+      DOMElements.editPedidoTelefono.value = pedidoObj.telefonoCliente || '';
+      DOMElements.editPedidoMonto.value = pedidoObj.montoTotal || 0;
+      DOMElements.editOriginalMonto.value = pedidoObj.montoTotal || 0;
+
+      DOMElements.editarPedidoModal.style.display = 'flex';
+  }
+
+  // ==================== CANCELAR PEDIDO ====================
+  window.cancelarPedido = async function(pedidoId) {
+      if (!auth.currentUser) return alert("Debes iniciar sesión para cancelar pedidos.");
+      
+      const pedidoSnapshot = await get(dbRef(db, `pedidos_historial/${pedidoId}`));
+      if (!pedidoSnapshot.exists()) {
+           return alert("Error: El pedido no se encontró.");
+      }
+      const pedidoObj = pedidoSnapshot.val();
+      
+      const confirmMsg = `¿Estás seguro de CANCELAR el pedido de ${pedidoObj.nombreCliente} por $${(pedidoObj.montoTotal || 0).toLocaleString('es-ES')}?`;
+      if (!confirm(confirmMsg)) return;
+
+      try {
+          await update(dbRef(db, `pedidos_historial/${pedidoId}`), {
+              estado: 'Cancelado',
+              estadoHistorial: 'Cancelado',
+              timestampCancelado: Date.now(),
+              canceladoPor: 'Administrador'
+          });
+          
+          const pendingSnapshot = await get(dbRef(db, `pedidos_pendientes/${pedidoId}`));
+          if (pendingSnapshot.exists()) {
+              await remove(dbRef(db, `pedidos_pendientes/${pedidoId}`));
+          }
+          
+          alert(`Pedido ${pedidoId.substring(0, 8)}... CANCELADO exitosamente.`);
+          
+          setTimeout(window.mostrarListaRepartidoresHistorial, 500);
+
+      } catch (error) {
+          console.error("Error al cancelar el pedido:", error);
+          alert("Hubo un error al intentar cancelar el pedido.");
+      }
+  }
+
+  // ==================== GUARDAR EDICIÓN DE PEDIDO ====================
+  DOMElements.formEditarPedido.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!auth.currentUser) return alert("Debes iniciar sesión para editar pedidos.");
+
+      const pedidoKey = DOMElements.editPedidoId.value;
+      const descripcion = DOMElements.editPedidoDescripcion.value.trim();
+      const direccion = DOMElements.editPedidoDireccion.value.trim();
+      const nombreCliente = DOMElements.editPedidoNombreCliente.value.trim();
+      const telefono = DOMElements.editPedidoTelefono.value.trim();
+      const monto = parseFloat(DOMElements.editPedidoMonto.value);
+      const originalMonto = parseFloat(DOMElements.editOriginalMonto.value);
+      
+      if (isNaN(monto) || monto <= 0) {
+          alert("Por favor, ingrese un monto total válido.");
+          return;
+      }
+      
+      DOMElements.editarPedidoModal.style.display = 'none';
+
+      const updates = {
+          descripcion: descripcion,
+          direccionCliente: direccion,
+          nombreCliente: nombreCliente,
+          telefonoCliente: telefono,
+          montoTotal: monto,
+      };
+      
+      const confirmMsg = `¿Deseas guardar los cambios para el pedido #${pedidoKey.substring(0, 8)}...?`;
+      if (!confirm(confirmMsg)) return;
+
+      try {
+          await update(dbRef(db, `pedidos_historial/${pedidoKey}`), updates);
+          
+          const pendingSnapshot = await get(dbRef(db, `pedidos_pendientes/${pedidoKey}`));
+          if (pendingSnapshot.exists()) {
+              await update(dbRef(db, `pedidos_pendientes/${pedidoKey}`), updates);
+          }
+          
+          if (monto !== originalMonto) {
+              const pedidoOriginal = allPedidos[pedidoKey];
+              const repartidorId = pedidoOriginal?.repartidorIdAsignado;
+              
+              if (repartidorId) {
+                  const montoFormat = monto.toLocaleString('es-ES', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 });
+                  const notificacionTexto = `[ADMIN] El pedido #${pedidoKey.substring(0, 4)}... ha sido modificado. Nuevo monto total: ${montoFormat}.`;
+                  
+                  await push(dbRef(db, `chats/${repartidorId}`), {
+                      remitente: "admin", 
+                      texto: notificacionTexto,
+                      timestamp: Date.now(), 
+                      rol_remitente: "Admin",
+                      tipo: "texto" 
+                  });
+              }
+          }
+
+          alert(`Pedido ${pedidoKey.substring(0, 8)}... EDITADO EXITOSAMENTE.`);
+          
+          setTimeout(window.mostrarListaRepartidoresHistorial, 500);
+
+      } catch (error) {
+          console.error("Error al editar el pedido:", error);
+          alert("Hubo un error al intentar editar el pedido. Detalle: " + error.message);
+      }
+  });
+  
+  // ==================== REENVIAR PEDIDO ====================
+  window.reenviarPedido = async (pedidoId) => {
+      if (!auth.currentUser) return alert("Debes iniciar sesión para reenviar un pedido.");
+      
+      const pedidoSnapshot = await get(dbRef(db, `pedidos_historial/${pedidoId}`));
+      if (!pedidoSnapshot.exists()) {
+           return alert("Error: El pedido original no se encontró.");
+      }
+      const pedidoObj = pedidoSnapshot.val();
+      
+      const confirmMsg = `¿Deseas REENVIAR el pedido CANCELADO de ${pedidoObj.nombreCliente} por $${(pedidoObj.montoTotal || 0).toLocaleString('es-ES')}? Se creará un NUEVO pedido pendiente.`;
+      if (!confirm(confirmMsg)) return;
+
+      const repartidorInfo = repartidoresInfoHistorial[pedidoObj.repartidorIdAsignado];
+      if (!repartidorInfo) {
+          return alert("Error: No se encontró información del repartidor asignado originalmente.");
+      }
+      
+      if (!isRepartidorOnline(repartidorInfo)) {
+           if (!confirm(`El repartidor ${repartidorInfo.nombre} no está ACTIVO. ¿Deseas reasignarlo de todos modos?`)) {
+               return;
+           }
+      }
+
+      const nuevoPedido = {
+          descripcion: pedidoObj.descripcion,
+          direccionCliente: pedidoObj.direccionCliente,
+          nombreCliente: pedidoObj.nombreCliente,
+          telefonoCliente: pedidoObj.telefonoCliente,
+          montoTotal: pedidoObj.montoTotal,
+          estado: 'Pendiente', 
+          timestampCreacion: Date.now(), 
+          repartidorIdAsignado: pedidoObj.repartidorIdAsignado, 
+          repartidorNombre: repartidorInfo.nombre,
+          clienteIdAsignado: pedidoObj.clienteIdAsignado || null, 
+      };
+      
+      try {
+          const newPedidoRef = await push(dbRef(db, `pedidos_pendientes`), nuevoPedido);
+          const pedidoKey = newPedidoRef.key;
+          
+          await set(dbRef(db, `pedidos_historial/${pedidoKey}`), {
+              ...nuevoPedido,
+              id: pedidoKey,
+              estadoHistorial: 'Pendiente', 
+              timestampAsignacion: Date.now()
+          });
+
+          if (pedidoObj.clienteIdAsignado) {
+              await update(dbRef(db, `users/${pedidoObj.clienteIdAsignado}`), {
+                  pedidoActivoId: pedidoKey, 
+                  tienePedidoAsignado: true 
+              });
+          }
+          
+          const montoFormat = nuevoPedido.montoTotal.toLocaleString('es-ES', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 });
+          const notificacionTexto = `[ADMIN] Tienes un NUEVO pedido asignado (Reenvío). Cliente: ${nuevoPedido.nombreCliente}, Monto: ${montoFormat}.`;
+          
+          await push(dbRef(db, `chats/${nuevoPedido.repartidorIdAsignado}`), {
+              remitente: "admin", 
+              texto: notificacionTexto,
+              timestamp: Date.now(), 
+              rol_remitente: "Admin",
+              tipo: "texto" 
+          });
+
+          alert(`Pedido reenviado exitosamente con el ID: ${pedidoKey.substring(0, 8)}... y notificado a ${repartidorInfo.nombre}.`);
+          
+          document.querySelector('[data-tab="repartidores"]').click();
+
+      } catch (error) {
+          console.error("Error al reenviar el pedido:", error);
+          alert("Hubo un error al intentar reenviar el pedido.");
+      }
+  }
+
+  // ==================== CIERRE DEL SCRIPT ====================
+  console.log('✅ Sistema completo cargado: Panel Admin + Limpieza Automática + Mapa en Tiempo Real');
+  
+</script>
+</body>
+</html>
