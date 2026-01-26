@@ -7,7 +7,14 @@
 
 <!-- Leaflet CSS para el mapa -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
+<!-- 🔍 ERUDA - Consola de Depuración Móvil -->
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>
+  eruda.init({
+    tool: ['console', 'elements', 'network', 'resources', 'info', 'sources'],
+    useShadowDom: true
+  });
+</script>
 <style>
   /* PALETA: #1A1A1A (Negro), #FFD700 (Dorado), #E0E0E0 (Plateado/Gris Claro), #555555 (Gris Oscuro) */
   
