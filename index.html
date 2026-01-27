@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel Domicilios — Admin</title>
+<title>Panel Domicilios — Admin v1.8 MAPA REAL-TIME</title>
 
 <!-- Leaflet CSS para el mapa -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -1313,9 +1313,9 @@
 
   // 🆕 Variables para limpieza automática de mensajes
   const MESSAGE_RETENTION_DAYS = 2; // Retener mensajes por 2 días
-  const MESSAGE_RETENTION_MS = MESSAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000; // 2 días en milisegundos
-  const MIN_MESSAGES_TO_KEEP = 10; // Mantener al menos 10 mensajes por seguridad
-  let cleanupExecuted = false; // Bandera para ejecutar limpieza una sola vez
+  const MESSAGE_RETENTION_MS = MESSAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const MIN_MESSAGES_TO_KEEP = 10;
+  let cleanupExecuted = false;
 
   // ==================== ELEMENTOS DEL DOM ====================
   const DOMElements = {
@@ -1372,12 +1372,6 @@
 
   // ==================== 🆕 SISTEMA DE LIMPIEZA AUTOMÁTICA DE MENSAJES ====================
   
-  /**
-   * 🗑️ Función para limpiar mensajes antiguos de todos los chats
-   * Se ejecuta automáticamente al cargar el panel
-   * Borra mensajes mayores a MESSAGE_RETENTION_DAYS días
-   * Mantiene al menos MIN_MESSAGES_TO_KEEP mensajes por seguridad
-   */
   async function cleanupOldMessages() {
       if (!auth.currentUser || cleanupExecuted) return;
       
@@ -1403,28 +1397,23 @@
               const messages = allChats[chatId];
               const messageKeys = Object.keys(messages);
               
-              // Ordenar mensajes por timestamp (más antiguos primero)
               const sortedMessages = messageKeys
                   .map(key => ({ key, ...messages[key] }))
                   .sort((a, b) => a.timestamp - b.timestamp);
               
-              // Identificar mensajes a eliminar
               const messagesToDelete = sortedMessages.filter(msg => 
                   msg.timestamp < cutoffTime
               );
               
-              // Calcular cuántos mensajes conservar
               const totalMessages = sortedMessages.length;
               const messagesToKeep = totalMessages - messagesToDelete.length;
               
-              // Si después de borrar quedarían menos de MIN_MESSAGES_TO_KEEP, ajustar
               let finalMessagesToDelete = messagesToDelete;
               if (messagesToKeep < MIN_MESSAGES_TO_KEEP && totalMessages > MIN_MESSAGES_TO_KEEP) {
                   const excessToDelete = totalMessages - MIN_MESSAGES_TO_KEEP;
                   finalMessagesToDelete = messagesToDelete.slice(0, excessToDelete);
               }
               
-              // Eliminar mensajes antiguos
               if (finalMessagesToDelete.length > 0) {
                   for (const msg of finalMessagesToDelete) {
                       await remove(dbRef(db, `chats/${chatId}/${msg.key}`));
@@ -1448,7 +1437,6 @@
   function initMap() {
       if (mapInitialized) return;
       
-      // Coordenadas de Armenia, Quindío, Colombia
       const armeniaCoords = [4.5339, -75.6811];
       
       map = L.map('map').setView(armeniaCoords, 13);
@@ -1462,17 +1450,24 @@
       console.log('✅ Mapa inicializado correctamente');
   }
   
-  // 🆕 FUNCIÓN DE ACTUALIZACIÓN EN TIEMPO REAL DEL MAPA
+  // 🔥 FUNCIÓN CRÍTICA: ACTUALIZACIÓN EN TIEMPO REAL DEL MAPA
   function updateMapMarkers(repartidoresData) {
       if (!map || !mapInitialized) {
           console.warn('⚠️ Mapa no inicializado, esperando...');
           return;
       }
       
+      console.log('');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🔄 ACTUALIZANDO MAPA - RECEPCIÓN DE DATOS GPS');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('📊 Datos completos recibidos:', repartidoresData);
+      console.log('');
+      
       const existingIds = Object.keys(mapMarkers);
       const currentIds = Object.keys(repartidoresData || {});
       
-      // Remover marcadores de repartidores que ya no existen
+      // Remover marcadores que ya no existen
       existingIds.forEach(id => {
           if (!currentIds.includes(id)) {
               map.removeLayer(mapMarkers[id]);
@@ -1492,14 +1487,24 @@
           if (isOnline) onlineCount++;
           else offlineCount++;
           
-          // 🔧 USAR ubicacionActual
-          const ubicacion = rep.ubicacionActual;
+          console.log(`\n🔍 Procesando: ${rep.nombre || repId}`);
+          console.log(`   📱 Estado: ${isOnline ? 'Online' : 'Offline'}`);
+          console.log(`   📊 Datos completos del repartidor:`, rep);
           
-          if (ubicacion && ubicacion.lat && ubicacion.lng) {
+          // 🔥 CORRECCIÓN CRÍTICA: BUSCAR EN ubicacionActual
+          const ubicacion = rep.ubicacionActual || rep.ubicacion;
+          
+          console.log(`   🎯 ubicacionActual:`, rep.ubicacionActual);
+          console.log(`   🎯 ubicacion (fallback):`, rep.ubicacion);
+          console.log(`   ✅ Ubicación seleccionada:`, ubicacion);
+          
+          if (ubicacion && ubicacion.lat && ubicacion.lon) {
               const lat = parseFloat(ubicacion.lat);
-              const lng = parseFloat(ubicacion.lng);
+              const lon = parseFloat(ubicacion.lon);
               
-              if (!isNaN(lat) && !isNaN(lng)) {
+              console.log(`   📍 Coordenadas parseadas: ${lat}, ${lon}`);
+              
+              if (!isNaN(lat) && !isNaN(lon)) {
                   const markerColor = isOnline ? '#27ae60' : '#555555';
                   const iconHtml = `
                       <div style="
@@ -1526,12 +1531,12 @@
                   
                   if (mapMarkers[repId]) {
                       // Actualizar posición del marcador existente
-                      mapMarkers[repId].setLatLng([lat, lng]);
+                      mapMarkers[repId].setLatLng([lat, lon]);
                       mapMarkers[repId].setIcon(icon);
-                      console.log(`🔄 Marcador actualizado: ${rep.nombre || repId} en ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                      console.log(`   ✅ Marcador actualizado en: ${lat.toFixed(6)}, ${lon.toFixed(6)}`);
                   } else {
                       // Crear nuevo marcador
-                      const marker = L.marker([lat, lng], { icon: icon }).addTo(map);
+                      const marker = L.marker([lat, lon], { icon: icon }).addTo(map);
                       
                       const nombre = rep.nombre || 'Repartidor';
                       const telefono = rep.telefono_principal || rep.telefono || 'N/A';
@@ -1540,7 +1545,6 @@
                       const accuracy = ubicacion.accuracy ? `±${ubicacion.accuracy}m` : 'N/A';
                       const trackingStatus = rep.trackingActivo ? '✅ Activo' : '❌ Inactivo';
                       
-                      // Calcular tiempo desde última actualización GPS
                       const gpsTimestamp = ubicacion.timestamp || rep.lastSeen;
                       let timeSinceUpdate = 'Desconocido';
                       if (gpsTimestamp) {
@@ -1568,13 +1572,14 @@
                       `);
                       
                       mapMarkers[repId] = marker;
-                      console.log(`✅ Nuevo marcador creado: ${nombre} en ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                      console.log(`   ✅ Nuevo marcador creado en: ${lat.toFixed(6)}, ${lon.toFixed(6)}`);
                   }
               } else {
-                  console.warn(`⚠️ Coordenadas inválidas para ${rep.nombre || repId}: ${lat}, ${lng}`);
+                  console.warn(`   ⚠️ Coordenadas inválidas (NaN): ${lat}, ${lon}`);
               }
           } else {
-              console.warn(`⚠️ Sin ubicación GPS para ${rep.nombre || repId}`);
+              console.warn(`   ⚠️ Sin ubicación GPS válida`);
+              console.warn(`   ❌ No se encontró ni ubicacionActual ni ubicacion`);
           }
       });
       
@@ -1583,15 +1588,23 @@
       document.getElementById('onlineReps').textContent = onlineCount;
       document.getElementById('offlineReps').textContent = offlineCount;
       
-      // Actualizar timestamp de última actualización del mapa
+      // Actualizar timestamp
       const lastUpdateElement = document.getElementById('lastMapUpdate');
       if (lastUpdateElement) {
           const now = new Date();
           lastUpdateElement.textContent = `Última actualización: ${now.toLocaleTimeString('es-ES')}`;
       }
       
-      console.log(`📊 Estadísticas del mapa: Total=${currentIds.length}, Online=${onlineCount}, Offline=${offlineCount}`);
+      console.log('');
+      console.log(`📊 ESTADÍSTICAS FINALES:`);
+      console.log(`   Total Repartidores: ${currentIds.length}`);
+      console.log(`   Online: ${onlineCount}`);
+      console.log(`   Offline: ${offlineCount}`);
+      console.log(`   Marcadores en mapa: ${Object.keys(mapMarkers).length}`);
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('');
   }
+  
   // ==================== FUNCIONES DE UTILIDAD ====================
   function formatTime(ms) {
       const totalSeconds = Math.floor(ms / 1000);
@@ -1732,11 +1745,10 @@
       if (user) {
           DOMElements.loginDiv.style.display = 'none';
           
-          // 🆕 Ejecutar limpieza automática al autenticarse
           if (!cleanupExecuted) {
               setTimeout(() => {
                   cleanupOldMessages();
-              }, 2000); // Esperar 2 segundos después del login
+              }, 2000);
           }
       } else {
           DOMElements.loginDiv.style.display = 'flex'; 
@@ -1962,88 +1974,85 @@
        
        return item;
   }
-// ==================== LISTENER DE CHATS (CORREGIDO - SIN DUPLICADOS) ====================
-let chatListenerActive = false; // 🆕 Bandera de control
-let lastProcessedChats = {}; // 🆕 Caché de últimos chats procesados
+  
+  // ==================== LISTENER DE CHATS ====================
+  let chatListenerActive = false;
+  let lastProcessedChats = {};
 
-onValue(dbRef(db, "chats"), async snapshot => { 
-  if (!auth.currentUser) return; 
-  
-  // 🆕 Evitar procesamiento simultáneo
-  if (chatListenerActive) {
-      console.log('⚠️ Listener ya procesando, ignorando evento duplicado');
-      return;
-  }
-  
-  chatListenerActive = true;
-  
-  const data = snapshot.val();
-  
-  // 🆕 Detectar si realmente hay cambios
-  const currentChatIds = data ? Object.keys(data).sort().join(',') : '';
-  const lastChatIds = Object.keys(lastProcessedChats).sort().join(',');
-  
-  if (currentChatIds === lastChatIds) {
-      console.log('📋 Sin cambios en chats, omitiendo actualización');
+  onValue(dbRef(db, "chats"), async snapshot => { 
+    if (!auth.currentUser) return; 
+    
+    if (chatListenerActive) {
+        console.log('⚠️ Listener ya procesando, ignorando evento duplicado');
+        return;
+    }
+    
+    chatListenerActive = true;
+    
+    const data = snapshot.val();
+    
+    const currentChatIds = data ? Object.keys(data).sort().join(',') : '';
+    const lastChatIds = Object.keys(lastProcessedChats).sort().join(',');
+    
+    if (currentChatIds === lastChatIds) {
+        console.log('📋 Sin cambios en chats, omitiendo actualización');
+        chatListenerActive = false;
+        return;
+    }
+    
+    lastProcessedChats = data || {};
+    allChatsData = data || {}; 
+    clientesEnChats = data || {}; 
+    
+    updateClientesDropdown(); 
+    
+    if (Object.keys(repartidoresInfoHistorial).length > 0) {
+        updateRepartidoresList(repartidoresInfoHistorial);
+    }
+    
+    if (!data) {
+      DOMElements.listaChats.innerHTML = "<p>No hay chats activos aún.</p>";
+      if (!DOMElements.clientesSection.classList.contains('active-chat')) {
+         DOMElements.chatBoxHeader.innerHTML = "<h3>Selecciona un chat para interactuar</h3>";
+      }
       chatListenerActive = false;
       return;
-  }
-  
-  lastProcessedChats = data || {};
-  allChatsData = data || {}; 
-  clientesEnChats = data || {}; 
-  
-  updateClientesDropdown(); 
-  
-  if (Object.keys(repartidoresInfoHistorial).length > 0) {
-      updateRepartidoresList(repartidoresInfoHistorial);
-  }
-  
-  if (!data) {
-    DOMElements.listaChats.innerHTML = "<p>No hay chats activos aún.</p>";
-    if (!DOMElements.clientesSection.classList.contains('active-chat')) {
-       DOMElements.chatBoxHeader.innerHTML = "<h3>Selecciona un chat para interactuar</h3>";
     }
+    
+    const chatIDs = [...new Set(Object.keys(data))];
+    
+    chatIDs.sort((idA, idB) => {
+        const mensajesA = Object.values(data[idA]);
+        const mensajesB = Object.values(data[idB]);
+        
+        const lastAdminA = ultimoMensajeLeido[idA] || 0;
+        const lastAdminB = ultimoMensajeLeido[idB] || 0;
+
+        const unreadA = mensajesA.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminA).length;
+        const unreadB = mensajesB.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminB).length;
+
+        if (unreadA !== unreadB) {
+            return unreadB - unreadA;
+        }
+        
+        const lastTimestampA = mensajesA.reduce((max, msg) => Math.max(max, msg.timestamp), 0);
+        const lastTimestampB = mensajesB.reduce((max, msg) => Math.max(max, msg.timestamp), 0);
+        
+        return lastTimestampB - lastTimestampA;
+    });
+
+    DOMElements.listaChats.innerHTML = "";
+    
+    const chatItemPromises = chatIDs.map(chatId => createChatItem(chatId, data[chatId]));
+    const chatItems = await Promise.all(chatItemPromises);
+
+    chatItems.forEach(item => {
+        DOMElements.listaChats.appendChild(item);
+    });
+    
+    console.log(`✅ Lista actualizada: ${chatIDs.length} chats únicos`);
     chatListenerActive = false;
-    return;
-  }
-  
-  // 🆕 Filtrar IDs únicos con Set
-  const chatIDs = [...new Set(Object.keys(data))];
-  
-  chatIDs.sort((idA, idB) => {
-      const mensajesA = Object.values(data[idA]);
-      const mensajesB = Object.values(data[idB]);
-      
-      const lastAdminA = ultimoMensajeLeido[idA] || 0;
-      const lastAdminB = ultimoMensajeLeido[idB] || 0;
-
-      const unreadA = mensajesA.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminA).length;
-      const unreadB = mensajesB.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminB).length;
-
-      if (unreadA !== unreadB) {
-          return unreadB - unreadA;
-      }
-      
-      const lastTimestampA = mensajesA.reduce((max, msg) => Math.max(max, msg.timestamp), 0);
-      const lastTimestampB = mensajesB.reduce((max, msg) => Math.max(max, msg.timestamp), 0);
-      
-      return lastTimestampB - lastTimestampA;
   });
-
-  // 🆕 Limpiar SOLO una vez al inicio
-  DOMElements.listaChats.innerHTML = "";
-  
-  const chatItemPromises = chatIDs.map(chatId => createChatItem(chatId, data[chatId]));
-  const chatItems = await Promise.all(chatItemPromises);
-
-  chatItems.forEach(item => {
-      DOMElements.listaChats.appendChild(item);
-  });
-  
-  console.log(`✅ Lista actualizada: ${chatIDs.length} chats únicos`);
-  chatListenerActive = false;
-});
 
   // ==================== ACTUALIZAR DROPDOWN DE CLIENTES ====================
   async function updateClientesDropdown() {
@@ -2088,7 +2097,8 @@ onValue(dbRef(db, "chats"), async snapshot => {
           document.getElementById("pedidoTelefono").value = clientData.telefono_principal || clientData.tel1 || clientData.telefono1 || clientData.telefono || '';
           document.getElementById("pedidoDireccion").value = clientData.direccion_residencia || clientData.direccion || '';
       }
-  });    //
+  });
+  
   // ==================== ABRIR CHAT ====================
   window.abrirChat = async function(chatId, chatData, isRepartidor, preResueltoNombre = null) {
     if (!auth.currentUser) return;
@@ -2244,7 +2254,7 @@ onValue(dbRef(db, "chats"), async snapshot => {
                   console.error(`Error al subir ${tipo}:`, error);
                   throw error;
               }
-          );
+              );
           
           await uploadTask;
           const url = await getDownloadURL(fileStorageRef);
@@ -2488,22 +2498,32 @@ onValue(dbRef(db, "chats"), async snapshot => {
     }
   }
 
-  // ==================== LISTENER DE REPARTIDORES INFO CON ACTUALIZACIÓN DE MAPA ====================
+  // ==================== 🔥 LISTENER DE REPARTIDORES INFO CON ACTUALIZACIÓN AUTOMÁTICA DEL MAPA ====================
   onValue(dbRef(db, "repartidores_info"), snapshot => {
     if (!auth.currentUser) return; 
     
     const data = snapshot.val();
     repartidoresInfoHistorial = data || {}; 
     
+    console.log('');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔥 FIREBASE LISTENER ACTIVADO - DATOS RECIBIDOS');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('⏰ Timestamp:', new Date().toLocaleTimeString('es-ES'));
+    console.log('📊 Datos completos de repartidores_info:', data);
+    console.log('📈 Total repartidores:', Object.keys(data || {}).length);
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('');
+    
     updateRepartidoresList(data);
     
-    // 🆕 ACTUALIZAR MAPA EN TIEMPO REAL - Se ejecuta cada vez que Firebase detecta cambios
-    // Esto incluye las actualizaciones de GPS cada 10 segundos del repartidor
+    // 🔥 ACTUALIZACIÓN AUTOMÁTICA DEL MAPA CADA VEZ QUE FIREBASE RECIBE DATOS
     if (mapInitialized) {
+        console.log('🗺️ Mapa inicializado: ACTUALIZANDO MARCADORES AUTOMÁTICAMENTE...');
         updateMapMarkers(data);
-        console.log('🔄 Mapa actualizado automáticamente - GPS recibido de Firebase');
+        console.log('✅ Actualización del mapa completada');
     } else {
-        console.log('⚠️ Mapa aún no inicializado, esperando activación de pestaña');
+        console.log('⚠️ Mapa NO inicializado - esperando que usuario abra pestaña de mapa');
     }
   });
 
@@ -2542,14 +2562,14 @@ onValue(dbRef(db, "chats"), async snapshot => {
           window.mostrarListaRepartidoresHistorial();
       }
       
-      // 🆕 INICIALIZAR MAPA CUANDO SE ACCEDE A LA PESTAÑA
+      // 🔥 INICIALIZAR MAPA CUANDO SE ACCEDE A LA PESTAÑA
       if (targetTab === 'mapaRepartidores') {
           if (!mapInitialized) {
               console.log('🗺️ Inicializando mapa...');
               initMap();
               updateMapMarkers(repartidoresInfoHistorial);
           } else {
-              console.log('🗺️ Mapa ya inicializado, actualizando marcadores...');
+              console.log('🗺️ Mapa ya inicializado, forzando actualización...');
               updateMapMarkers(repartidoresInfoHistorial);
           }
       }
@@ -2560,7 +2580,8 @@ onValue(dbRef(db, "chats"), async snapshot => {
   window.addEventListener('load', function() {
        window.volverAlista();
        console.log('✅ Panel de administrador cargado correctamente');
-       console.log(`🗑️ Sistema de limpieza automática activado: mensajes >  ${MESSAGE_RETENTION_DAYS} días serán eliminados`);
+       console.log(`🗑️ Sistema de limpieza automática activado: mensajes > ${MESSAGE_RETENTION_DAYS} días serán eliminados`);
+       console.log('🗺️ Sistema de mapa en tiempo real activado');
   });
 
   // ==================== CÓDIGO DE PEDIDOS Y FORMULARIOS ====================
@@ -3169,7 +3190,18 @@ onValue(dbRef(db, "chats"), async snapshot => {
   }
 
   // ==================== CIERRE DEL SCRIPT ====================
-  console.log('✅ Sistema completo cargado: Panel Admin + Limpieza Automática + Mapa en Tiempo Real');
+  console.log('');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('✅ SISTEMA COMPLETO CARGADO');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('📦 Características activas:');
+  console.log('   ✅ Panel Admin completo');
+  console.log('   ✅ Limpieza automática de mensajes');
+  console.log('   ✅ Mapa en tiempo real cada 5 segundos');
+  console.log('   ✅ Listener de repartidores_info activado');
+  console.log('   ✅ Sistema de ubicación CORREGIDO (ubicacionActual)');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('');
   
 </script>
 </body>
