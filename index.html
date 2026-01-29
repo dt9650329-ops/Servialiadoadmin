@@ -268,6 +268,9 @@
     overflow-y: auto; 
     padding-right: 10px;
     min-height: 550px;
+    background: #1A1A1A;
+    padding: 15px;
+    border-radius: 8px;
   }
   .chat-header-row {
       display: flex;
@@ -496,14 +499,14 @@
     border-radius: 12px 12px 12px 0;
   }
   .repartidor-msg {
-    background-color: #555555;
+    background-color: #3C3C3C; /* Gris más claro para mejor contraste */
     color: #E0E0E0;
     align-self: flex-start;
     margin-right: auto;
     border-radius: 12px 12px 12px 0;
   }
   .repartidor-msg .chat-time {
-      color: rgba(255, 255, 255, 0.7);
+      color: #A0A0A0; /* Color más visible para la hora */
   }
   #chatBox p { color: #E0E0E0; } 
   .mensaje-content img {
@@ -1311,11 +1314,6 @@
           console.log(`\n Procesando: ${rep.nombre || repId}`);
           console.log(`    Estado: ${isOnline ? 'Online' : 'Offline'}`);
           console.log(`    Datos completos del repartidor:`, rep);
-          //  CORRECCI�N CR�TICA: BUSCAR EN ubicacionActual
-          const ubicacion = rep.ubicacionActual || rep.ubicacion;
-          console.log(`    ubicacionActual:`, rep.ubicacionActual);
-          console.log(`    ubicacion (fallback):`, rep.ubicacion);
-          console.log(`    Ubicaci�n seleccionada:`, ubicacion);
           if (ubicacion && ubicacion.lat && ubicacion.lon) {
               const lat = parseFloat(ubicacion.lat);
               const lon = parseFloat(ubicacion.lon);
@@ -1717,69 +1715,79 @@
   }
   // ==================== CREAR ITEM DE CHAT ====================
   async function createChatItem(chatId, data) {
-       const clientResult = await getClientData(chatId);
-       const isRepartidor = clientResult.isRepartidor;
-       const nombreMostrar = clientResult.nombreMostrar;
-       const tipoChat = isRepartidor ? '&#x1F6B6; Repartidor' : '&#x1F4AC; Cliente';
-       const mensajesArray = Object.values(data);
-       let lastAdminMsgTimestamp = ultimoMensajeLeido[chatId] || 0; 
-       if (lastAdminMsgTimestamp === 0) {
-           mensajesArray.forEach(msg => {
-               if (msg.rol_remitente === "Admin") {
-                   lastAdminMsgTimestamp = Math.max(lastAdminMsgTimestamp, msg.timestamp);
-               }
-           });
-           ultimoMensajeLeido[chatId] = lastAdminMsgTimestamp;
-       }
-       const unreadCount = mensajesArray.filter(msg => 
-           (msg.rol_remitente !== "Admin") && (msg.timestamp > lastAdminMsgTimestamp)
-       ).length;
-       if (unreadCount > 0 && clienteActivo !== chatId) {
-           const audioToPlay = isRepartidor ? DOMElements.notificationSoundRepartidor : DOMElements.notificationSoundCliente;
-           if (audioToPlay && audioToPlay.src && audioToPlay.src.includes('http')) {
-               setTimeout(() => {
-                   if (document.body.contains(audioToPlay)) {
-                       audioToPlay.play().catch(e => {
-                           console.log("Audio notification disabled");
-                       });
-                   }
-               }, 100);
-           }
-       }
-       const item = document.createElement("div");
-       item.classList.add("chat-item");
-       if (clienteActivo === chatId) {
-           item.classList.add("active-client");
-       }
-       item.setAttribute('data-chat-id', chatId);
-       const nameSpan = document.createElement('span');
-       nameSpan.innerHTML = `<strong>${tipoChat}</strong>: ${nombreMostrar}`; 
-       item.appendChild(nameSpan);
-       if (unreadCount > 0) {
-           const badge = document.createElement('span');
-           badge.classList.add('new-messages-badge');
-           badge.textContent = unreadCount;
-           item.appendChild(badge);
-       }
-       item.addEventListener("click", () => {
-           if (!auth.currentUser) return alert("Debes iniciar sesión para ver chats.");
-           window.abrirChat(chatId, clientResult.data, clientResult.isRepartidor, clientResult.nombreMostrar); 
-       });
-       return item;
-  }
-  // ==================== LISTENER DE CHATS ====================
-  onValue(dbRef(db, "chats"), async snapshot => { 
-    if (!auth.currentUser) {
-        DOMElements.listaChats.innerHTML = "<p>Inicia sesión para ver los chats.</p>";
-        return;
-    } 
-    if (chatListenerActive) {
-        console.log(' Listener ya procesando, ignorando evento duplicado');
-        return;
+    const clientResult = await getClientData(chatId);
+    const clientData = clientResult.data || {};
+    const nombreMostrar = clientResult.nombreMostrar;
+    const isRepartidor = clientResult.isRepartidor;
+    const tipoChat = isRepartidor ? '🚴 Repartidor' : '👤 Cliente';
+    
+    const mensajesArray = Object.values(data);
+    let lastAdminMsgTimestamp = ultimoMensajeLeido[chatId] || 0;
+    
+    if (lastAdminMsgTimestamp === 0) {
+        mensajesArray.forEach(msg => {
+            if (msg.rol_remitente === "Admin") {
+                lastAdminMsgTimestamp = Math.max(lastAdminMsgTimestamp, msg.timestamp);
+            }
+        });
+        ultimoMensajeLeido[chatId] = lastAdminMsgTimestamp;
     }
-    chatListenerActive = true;
-    console.log('📡 LISTENER EJECUTÁNDOSE - Usuario:', auth.currentUser?.email, '- Datos:', data ? Object.keys(data).length + ' chats' : 'SIN DATOS');
-    const data = snapshot.val();
+    
+    const unreadCount = mensajesArray.filter(msg => 
+        (msg.rol_remitente !== "Admin") && (msg.timestamp > lastAdminMsgTimestamp)
+    ).length;
+    
+    if (unreadCount > 0 && clienteActivo !== chatId) {
+        const audioToPlay = isRepartidor ? DOMElements.audioNotifRepartidor : DOMElements.audioNotif;
+        if (audioToPlay && audioToPlay.src && audioToPlay.paused) {
+            setTimeout(() => {
+                if (document.body.contains(audioToPlay)) {
+                    audioToPlay.play().catch(e => {
+                        console.log("Audio notification disabled by browser:", e);
+                    });
+                }
+            }, 100);
+        }
+    }
+    
+    const item = document.createElement("div");
+    item.classList.add("chat-item");
+    item.dataset.chatId = chatId;
+    
+    let badgeHTML = "";
+    if (unreadCount > 0) {
+        badgeHTML = `<span class="new-messages-badge">${unreadCount}</span>`;
+    }
+    
+    const telefono = clientData.telefono_principal || clientData.telefono || clientData.tel1 || 'Sin teléfono';
+    
+    item.innerHTML = `
+        <div class="historial-item-container">
+            <strong>${nombreMostrar}</strong>
+            <span>📱 ${telefono} • ${tipoChat}</span>
+        </div>
+        ${badgeHTML}
+    `;
+    
+    item.addEventListener("click", () => {
+        window.abrirChat(chatId, clientData, isRepartidor, nombreMostrar);
+    });
+    
+    return item;
+}
+  // ==================== LISTENER DE CHATS ====================
+onValue(dbRef(db, "chats"), async snapshot => { 
+  if (!auth.currentUser) {
+      DOMElements.listaChats.innerHTML = "<p>Inicia sesión para ver los chats.</p>";
+      return;
+  } 
+  if (chatListenerActive) {
+      console.log('⏭ Listener ya procesando, ignorando evento duplicado');
+      return;
+  }
+  chatListenerActive = true;
+  const data = snapshot.val();  // ✅ CORRECCIÓN: Declara 'data' PRIMERO
+  console.log('📡 LISTENER EJECUTÁNDOSE - Usuario:', auth.currentUser?.email, '- Datos:', data ? Object.keys(data).length + ' chats' : 'SIN DATOS');
     const currentChatIds = data ? Object.keys(data).sort().join(',') : '';
     const lastChatIds = Object.keys(lastProcessedChats).sort().join(',');
     if (currentChatIds === lastChatIds) {
@@ -1958,32 +1966,31 @@
         let latestTimestamp = ultimoMensajeLeido[chatId] || 0; 
         if (mensajes) {
             Object.keys(mensajes).sort((a, b) => mensajes[a].timestamp - mensajes[b].timestamp).forEach(key => {
-                const data = mensajes[key];
-                let tipo = "admin";
-                if (data.rol_remitente === "Cliente" || data.remitente === "cliente") {
-                    tipo = "usuario"; 
-                } else if (data.rol_remitente === "Repartidor" || data.remitente === "repartidor") {
-                    tipo = "repartidor-msg"; 
-                } else if (data.rol_remitente === "Admin" || data.remitente === "admin") {
-                    tipo = "admin";
-                } else if (!data.rol_remitente && data.remitente && data.remitente !== "admin") {
-                    tipo = "repartidor-msg";
-                }
-                const formattedTime = formatTimestamp(data.timestamp);
-                let contentHTML = data.texto || data.mensaje || '';
-                const tipoAdjunto = data.tipo_adjunto || data.tipo || 'texto';
+                const msgData = mensajes[key];
+                let tipo = "repartidor-msg"; // Por defecto, asume que es del repartidor
+if (msgData.rol_remitente === "Admin" || msgData.remitente === "admin") {
+    tipo = "admin";
+} else if (msgData.rol_remitente === "Cliente") {
+    tipo = "usuario"; 
+} else if (msgData.rol_remitente === "Repartidor") {
+    tipo = "repartidor-msg";
+}
+console.log(`Mensaje: "${msgData.texto?.substring(0, 20)}..." - Tipo: ${tipo} - Rol: ${msgData.rol_remitente}`);
+                const formattedTime = formatTimestamp(msgData.timestamp);
+                let contentHTML = msgData.texto || msgData.mensaje || '';
+                const tipoAdjunto = msgData.tipo_adjunto || msgData.tipo || 'texto';
                 if (tipoAdjunto === 'foto' || tipoAdjunto === 'image' || tipoAdjunto === 'imagen') {
-                    const imageUrl = data.referencia_adjunto || data.imagenURL || data.texto || data.mensaje || '';
+                    const imageUrl = msgData.referencia_adjunto || msgData.imagenURL || msgData.texto || msgData.mensaje || '';
                     contentHTML = `<a href="${imageUrl}" target="_blank">
                                        <img src="${imageUrl}" alt="Foto" loading="lazy">
                                        <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left;">[Ver Imagen]</span>
                                    </a>`;
                 } else if (tipoAdjunto === 'audio') {
-                    const audioUrl = data.referencia_adjunto || data.audioURL || data.texto || data.mensaje || '';
+                    const audioUrl = msgData.referencia_adjunto || msgData.audioURL || msgData.texto || msgData.mensaje || '';
                     contentHTML = `<audio controls src="${audioUrl}"></audio>
                                    <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left;">[Reproducir Audio]</span>`;
                 } else {
-                    contentHTML = (data.texto || data.mensaje || '').replace(/\n/g, '<br>');
+                    contentHTML = (msgData.texto || msgData.mensaje || '').replace(/\n/g, '<br>');
                 }
                 const div = document.createElement("div");
                 div.className = `mensaje ${tipo}`;
@@ -1992,8 +1999,8 @@
                     <div class="chat-time">${formattedTime}</div>
                 `;
                 DOMElements.chatBox.appendChild(div);
-                if (data.rol_remitente === "Admin") {
-                    latestTimestamp = Math.max(latestTimestamp, data.timestamp);
+                if (msgData.rol_remitente === "Admin") {
+                    latestTimestamp = Math.max(latestTimestamp, msgData.timestamp);
                 }
             });
         } else {
@@ -2829,3 +2836,4 @@ return alert("Error: El pedido original no se encontr�.");
 </script>
 </body>
 </html>
+
