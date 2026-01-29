@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel Domicilios  Admin v1.8 MAPA REAL-TIME</title>
+<title>Panel Domicilios Admin v1.8 MAPA REAL-TIME - CORREGIDO v2.0</title>
+<!-- ARCHIVO CORREGIDO - VERSIÓN 2.0 - FECHA: 28 ENE 2025 -->
 <!-- Leaflet CSS para el mapa -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <!--  ERUDA - Consola de Depuracion Movil -->
@@ -69,6 +70,25 @@
       background: #FFE54C;
   }
   #loginError { color: #FFD700 !important; }
+  /* ==================== BOTÓN CERRAR SESIÓN ==================== */
+  #logoutBtn {
+    position: fixed;
+    top: 70px;
+    right: 15px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 999;
+    font-size: 12px;
+    transition: background 0.2s;
+  }
+  #logoutBtn:hover {
+    background: #c82333;
+  }
   /* ==================== HEADER Y TABS ==================== */
   header {
     display: flex;
@@ -933,6 +953,8 @@
         <p id="loginError" style="color: #FFD700; margin-top: 10px; text-align: center;"></p>
     </div>
 </div>
+<!-- ==================== BOTÓN CERRAR SESIÓN ==================== -->
+<button id="logoutBtn" style="display: none;">Salir</button>
 <!-- ==================== HEADER NAVIGATION ==================== -->
 <header>
   <div class="header-content-wrapper">
@@ -1090,15 +1112,15 @@
     </div>
 </div>
 <!-- ==================== AUDIOS DE NOTIFICACI�N ==================== -->
-<!-- <audio id="notificationSoundCliente" src="https://github.com/dt9650329-ops/Chat-administrador-/raw/f67a159f93aed6be1d6f7f02709384111cd84b7e/%E2%9C%A8Monedas%20Cayendo%20__%20Efectos%20De%20Sonidos%20(MP3_160K).mp3" preload="auto"></audio> -->
-<!-- <audio id="notificationSoundRepartidor" src="https://github.com/dt9650329-ops/Chat-administrador-/raw/f67a159f93aed6be1d6f7f02709384111cd84b7e/%E2%9C%A8Monedas%20Cayendo%20__%20Efectos%20De%20Sonidos%20(MP3_160K).mp3" preload="auto"></audio> -->
-<!-- Leaflet JS -->
+ <audio id="notificationSoundCliente" src="https://github.com/dt9650329-ops/Chat-administrador-/raw/f67a159f93aed6be1d6f7f02709384111cd84b7e/%E2%9C%A8Monedas%20Cayendo%20__%20Efectos%20De%20Sonidos%20(MP3_160K).mp3" preload="auto"></audio> 
+<audio id="notificationSoundRepartidor" src="https://github.com/dt9650329-ops/Chat-administrador-/raw/f67a159f93aed6be1d6f7f02709384111cd84b7e/%E2%9C%A8Monedas%20Cayendo%20__%20Efectos%20De%20Sonidos%20(MP3_160K).mp3" preload="auto"></audio> 
+ Leaflet JS 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module">
   // ==================== IMPORTS DE FIREBASE ====================
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getDatabase, ref as dbRef, onValue, push, remove, set, get, update, off } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
   // ==================== CONFIGURACI�N FIREBASE ====================
   const firebaseConfig = {
@@ -1129,6 +1151,9 @@
   let mediaRecorder = null;
   let audioChunks = [];
   let isRecording = false;
+  // Variables para el listener de chats
+  let chatListenerActive = false;
+  let lastProcessedChats = {};
   // Variables para el mapa
   let map = null;
   let mapMarkers = {};
@@ -1189,6 +1214,7 @@
       authPassword: document.getElementById('authPassword'),
       authError: document.getElementById('authError'),
       authSubmitBtn: document.getElementById('authSubmitBtn'),
+      logoutBtn: document.getElementById('logoutBtn'),
   };
   // ====================  SISTEMA DE LIMPIEZA AUTOM�TICA DE MENSAJES ====================
   async function cleanupOldMessages() {
@@ -1277,8 +1303,11 @@
       currentIds.forEach(repId => {
           const rep = repartidoresData[repId];
           const isOnline = isRepartidorOnline(rep);
-          if (isOnline) onlineCount++;
-          else offlineCount++;
+          if (isOnline) {
+              onlineCount++;
+          } else {
+              offlineCount++;
+          }
           console.log(`\n Procesando: ${rep.nombre || repId}`);
           console.log(`    Estado: ${isOnline ? 'Online' : 'Offline'}`);
           console.log(`    Datos completos del repartidor:`, rep);
@@ -1495,16 +1524,60 @@
           }
       }
   });
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
       if (user) {
+          console.log('✅ Usuario autenticado:', user.email);
           DOMElements.loginDiv.style.display = 'none';
+          DOMElements.logoutBtn.style.display = 'block';
           if (!cleanupExecuted) {
               setTimeout(() => {
                   cleanupOldMessages();
               }, 2000);
           }
+          // Resetear el historial para forzar que el listener actualice la interfaz
+          lastProcessedChats = {};
+          console.log('✅ Listener de chats reactivado - esperando actualización...');
+          
+          
+          // FORZAR ACTUALIZACIÓN DEL LISTENER
+          console.log('✅ Forzando actualización del listener de chats...');
+          setTimeout(async () => {
+              try {
+                  const snapshot = await get(dbRef(db, "chats"));
+                  console.log('📊 Snapshot obtenido:', snapshot.exists() ? 'CON DATOS' : 'SIN DATOS');
+              } catch (error) {
+                  console.error('❌ Error al verificar chats:', error);
+              }
+          }, 500);
+          try {
+              const snapshot = await get(dbRef(db, "chats"));
+              const data = snapshot.val();
+              if (data) {
+                  console.log('📊 Datos de chats recibidos:', Object.keys(data).length, 'chats');
+                  lastProcessedChats = {};
+                  // El listener onValue se encargará de procesarlos
+              } else {
+                  console.log('⚠️ No hay chats en la base de datos');
+                  DOMElements.listaChats.innerHTML = "<p>No hay chats activos aún.</p>";
+              }
+          } catch (error) {
+              console.error('❌ Error al cargar chats iniciales:', error);
+          }
       } else {
-          DOMElements.loginDiv.style.display = 'flex'; 
+          console.log('❌ Usuario no autenticado');
+          DOMElements.loginDiv.style.display = 'flex';
+          DOMElements.logoutBtn.style.display = 'none';
+      }
+  });
+  // ==================== BOTÓN CERRAR SESIÓN ====================
+  DOMElements.logoutBtn.addEventListener('click', async () => {
+      if (confirm('¿Cerrar sesión?')) {
+          try {
+              await signOut(auth);
+              location.reload();
+          } catch (error) {
+              alert('Error al cerrar sesión');
+          }
       }
   });
   // ==================== FUNCIONES DE NAVEGACI�N ====================
@@ -1551,7 +1624,7 @@
                 console.error(`Error al obtener datos de repartidor:`, error);
             }
        } else {
-            const fullChatId = chatId;
+            const fullChatId = chatId || '';
             const uidLimpio = fullChatId.replace('cliente_auth_', '');
             const routesToTry = [
                 `users/${fullChatId}`, 
@@ -1665,10 +1738,11 @@
            const audioToPlay = isRepartidor ? DOMElements.notificationSoundRepartidor : DOMElements.notificationSoundCliente;
            if (audioToPlay && audioToPlay.src && audioToPlay.src.includes('http')) {
                setTimeout(() => {
-                    audioToPlay.play().catch(e => {
-                        // Silenciar error de audio - elemento deshabilitado temporalmente
-                        console.log("Audio notification disabled");
-                    });
+                   if (document.body.contains(audioToPlay)) {
+                       audioToPlay.play().catch(e => {
+                           console.log("Audio notification disabled");
+                       });
+                   }
                }, 100);
            }
        }
@@ -1688,21 +1762,23 @@
            item.appendChild(badge);
        }
        item.addEventListener("click", () => {
-           if (!auth.currentUser) return alert("Debes iniciar sesi�n para ver chats.");
+           if (!auth.currentUser) return alert("Debes iniciar sesión para ver chats.");
            window.abrirChat(chatId, clientResult.data, clientResult.isRepartidor, clientResult.nombreMostrar); 
        });
        return item;
   }
   // ==================== LISTENER DE CHATS ====================
-  let chatListenerActive = false;
-  let lastProcessedChats = {};
   onValue(dbRef(db, "chats"), async snapshot => { 
-    if (!auth.currentUser) return; 
+    if (!auth.currentUser) {
+        DOMElements.listaChats.innerHTML = "<p>Inicia sesión para ver los chats.</p>";
+        return;
+    } 
     if (chatListenerActive) {
         console.log(' Listener ya procesando, ignorando evento duplicado');
         return;
     }
     chatListenerActive = true;
+    console.log('📡 LISTENER EJECUTÁNDOSE - Usuario:', auth.currentUser?.email, '- Datos:', data ? Object.keys(data).length + ' chats' : 'SIN DATOS');
     const data = snapshot.val();
     const currentChatIds = data ? Object.keys(data).sort().join(',') : '';
     const lastChatIds = Object.keys(lastProcessedChats).sort().join(',');
@@ -1750,6 +1826,61 @@
     console.log(` Lista actualizada: ${chatIDs.length} chats �nicos`);
     chatListenerActive = false;
   });
+  // ==================== FUNCIÓN PARA FORZAR CARGA DE CHATS ====================
+  async function forceLoadChats() {
+      console.log('🔄 Forzando carga manual de chats...');
+      try {
+          const snapshot = await get(dbRef(db, "chats"));
+          const data = snapshot.val();
+          
+          console.log('📊 Datos recibidos:', data ? Object.keys(data).length + ' chats' : 'Sin chats');
+          
+          if (!data) {
+              DOMElements.listaChats.innerHTML = "<p>No hay chats activos aún.</p>";
+              return;
+          }
+          
+          // Actualizar variables globales
+          lastProcessedChats = data;
+          allChatsData = data;
+          clientesEnChats = data;
+          updateClientesDropdown();
+          
+          if (Object.keys(repartidoresInfoHistorial).length > 0) {
+              updateRepartidoresList(repartidoresInfoHistorial);
+          }
+          
+          // Crear lista de chats
+          const chatIDs = [...new Set(Object.keys(data))];
+          chatIDs.sort((idA, idB) => {
+              const mensajesA = Object.values(data[idA]);
+              const mensajesB = Object.values(data[idB]);
+              const lastAdminA = ultimoMensajeLeido[idA] || 0;
+              const lastAdminB = ultimoMensajeLeido[idB] || 0;
+              const unreadA = mensajesA.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminA).length;
+              const unreadB = mensajesB.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminB).length;
+              if (unreadA !== unreadB) {
+                  return unreadB - unreadA;
+              }
+              const lastTimestampA = mensajesA.reduce((max, msg) => Math.max(max, msg.timestamp), 0);
+              const lastTimestampB = mensajesB.reduce((max, msg) => Math.max(max, msg.timestamp), 0);
+              return lastTimestampB - lastTimestampA;
+          });
+          
+          DOMElements.listaChats.innerHTML = "";
+          const chatItemPromises = chatIDs.map(chatId => createChatItem(chatId, data[chatId]));
+          const chatItems = await Promise.all(chatItemPromises);
+          chatItems.forEach(item => {
+              DOMElements.listaChats.appendChild(item);
+          });
+          
+          console.log(`✅ Chats cargados: ${chatIDs.length} chats únicos`);
+          
+      } catch (error) {
+          console.error('❌ Error al cargar chats:', error);
+          DOMElements.listaChats.innerHTML = "<p style='color: red;'>Error al cargar chats. Verifica las reglas de Firebase.</p>";
+      }
+  }
   // ==================== ACTUALIZAR DROPDOWN DE CLIENTES ====================
   async function updateClientesDropdown() {
       if (!auth.currentUser) return;
@@ -1828,11 +1959,15 @@
         if (mensajes) {
             Object.keys(mensajes).sort((a, b) => mensajes[a].timestamp - mensajes[b].timestamp).forEach(key => {
                 const data = mensajes[key];
-                let tipo = "admin"; 
-                if (data.rol_remitente === "Cliente") {
+                let tipo = "admin";
+                if (data.rol_remitente === "Cliente" || data.remitente === "cliente") {
                     tipo = "usuario"; 
-                } else if (data.rol_remitente === "Repartidor") {
+                } else if (data.rol_remitente === "Repartidor" || data.remitente === "repartidor") {
                     tipo = "repartidor-msg"; 
+                } else if (data.rol_remitente === "Admin" || data.remitente === "admin") {
+                    tipo = "admin";
+                } else if (!data.rol_remitente && data.remitente && data.remitente !== "admin") {
+                    tipo = "repartidor-msg";
                 }
                 const formattedTime = formatTimestamp(data.timestamp);
                 let contentHTML = data.texto || data.mensaje || '';
@@ -2607,12 +2742,12 @@
                   });
               }
           }   
- alert(`Pedido ${pedidoKey.substring(0, 8)}... EDITADO EXITOSAMENTE.`);
-  setTimeout(window.mostrarListaRepartidoresHistorial, 500);
-   } catch (error) {
- console.error("Error al editar el pedido:", error);
-alert("Hubo un error al intentar editar el pedido. Detalle: " + error.message);
-    }
+          alert(`Pedido ${pedidoKey.substring(0, 8)}... EDITADO EXITOSAMENTE.`);
+          setTimeout(window.mostrarListaRepartidoresHistorial, 500);
+      } catch (error) {
+          console.error("Error al editar el pedido:", error);
+          alert("Hubo un error al intentar editar el pedido. Detalle: " + error.message);
+      }
 });
   // ==================== REENVIAR PEDIDO ====================
  window.reenviarPedido = async (pedidoId) => {
@@ -2632,7 +2767,9 @@ return alert("Error: El pedido original no se encontr�.");
            if (!confirm(`El repartidor ${repartidorInfo.nombre} no est� ACTIVO. �Deseas reasignarlo de todos modos?`)) {
                return;
            }
-      }
+      } 
+     
+   
       const nuevoPedido = {
           descripcion: pedidoObj.descripcion,
           direccionCliente: pedidoObj.direccionCliente,
