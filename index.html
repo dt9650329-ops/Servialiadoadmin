@@ -1978,7 +1978,7 @@ if (msgData.rol_remitente === "Admin" || msgData.remitente === "admin") {
 console.log(`Mensaje: "${msgData.texto?.substring(0, 20)}..." - Tipo: ${tipo} - Rol: ${msgData.rol_remitente}`);
                 const formattedTime = formatTimestamp(msgData.timestamp);
                 let contentHTML = msgData.texto || msgData.mensaje || '';
-                const tipoAdjunto = msgData.tipo_adjunto || msgData.tipo || 'texto';
+                const audioUrl = msgData.url || msgData.referencia_adjunto || msgData.audioURL || '';
                 if (tipoAdjunto === 'foto' || tipoAdjunto === 'image' || tipoAdjunto === 'imagen') {
                     const imageUrl = msgData.referencia_adjunto || msgData.imagenURL || msgData.texto || msgData.mensaje || '';
                     contentHTML = `<a href="${imageUrl}" target="_blank">
@@ -2053,15 +2053,14 @@ console.log(`Mensaje: "${msgData.texto?.substring(0, 20)}..." - Tipo: ${tipo} - 
               }
               );
           await uploadTask;
-          const url = await getDownloadURL(fileStorageRef);
-          await push(dbRef(db, `chats/${clienteActivo}`), {
-            remitente: "admin", 
-            texto: tipo === 'foto' ? ' Imagen' : ' Audio',
-            timestamp: Date.now(), 
-            rol_remitente: "Admin",
-            tipo_adjunto: tipo,
-            referencia_adjunto: url
-          });
+const url = await getDownloadURL(fileStorageRef);
+await push(dbRef(db, `chats/${clienteActivo}`), {
+  remitente: "admin", 
+  timestamp: Date.now(), 
+  rol_remitente: "Admin",
+  tipo: tipo === 'foto' ? 'imagen' : 'audio',
+  url: url
+});
           ultimoMensajeLeido[clienteActivo] = Date.now();
           DOMElements.fileUploadStatus.textContent = ' Archivo enviado exitosamente';
       } catch (error) {
@@ -2129,7 +2128,7 @@ console.log(`Mensaje: "${msgData.texto?.substring(0, 20)}..." - Tipo: ${tipo} - 
     if (!texto || !clienteActivo) return;
     push(dbRef(db, `chats/${clienteActivo}`), {
       remitente: "admin", 
-      texto: texto,
+      mensaje: texto,
       timestamp: Date.now(), 
       rol_remitente: "Admin",
       tipo: tipo 
