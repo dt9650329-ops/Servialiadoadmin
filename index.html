@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel Domicilios Admin v1.9 - MAPA CORREGIDO COMPLETO</title>
-<!-- VERSIÓN FINAL - FECHA: 30 ENE 2025 -->
-<!-- ✅ CORRECCIÓN: Variable ubicacion extraída correctamente -->
-<!-- ✅ MEJORA: Acepta lon y lng en ubicaciones -->
-<!-- ✅ MEJORA: Maneja 3 formatos diferentes de ubicación -->
+<title>Panel Domicilios Admin v2.0 - MULTIMEDIA SINCRONIZADO</title>
+<!-- VERSIÓN CORREGIDA - FECHA: 30 ENE 2026 -->
+<!-- ✅ CORRECCIÓN CRÍTICA: Lee imagenUrl y audioUrl del repartidor -->
+<!-- ✅ MEJORA: Compatible con campos del admin (url) y repartidor (imagenUrl/audioUrl) -->
+<!-- ✅ MEJORA: Logs de diagnóstico y manejo de errores -->
 <!-- Leaflet CSS para el mapa -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <!--  ERUDA - Consola de Depuracion Movil -->
@@ -2010,20 +2010,50 @@ if (msgData.rol_remitente === "Admin" || msgData.remitente === "admin") {
 } else if (msgData.rol_remitente === "Repartidor") {
     tipo = "repartidor-msg";
 }
-console.log(`Mensaje: "${msgData.texto?.substring(0, 20)}..." - Tipo: ${tipo} - Rol: ${msgData.rol_remitente}`);
+console.log(`Mensaje: "${msgData.texto?.substring(0, 20)}..." - Tipo: ${tipo} - Rol: ${msgData.rol_remitente} - TipoMensaje: ${msgData.tipo || 'texto'}`);
+                // ✅ DIAGNÓSTICO: Log completo del mensaje si es multimedia
+                if ((msgData.tipo === 'imagen' || msgData.tipo === 'foto' || msgData.tipo === 'audio') && msgData.rol_remitente !== 'Admin') {
+                    console.log('🔍 MENSAJE MULTIMEDIA DETECTADO:', {
+                        tipo: msgData.tipo,
+                        rol: msgData.rol_remitente,
+                        url: msgData.url || 'NO PRESENTE',
+                        referencia_adjunto: msgData.referencia_adjunto || 'NO PRESENTE',
+                        imagenURL: msgData.imagenURL || 'NO PRESENTE',
+                        audioURL: msgData.audioURL || 'NO PRESENTE',
+                        todosLosCampos: Object.keys(msgData)
+                    });
+                }
                 const formattedTime = formatTimestamp(msgData.timestamp);
                 let contentHTML = msgData.mensaje || msgData.texto || '';
 const tipoMensaje = msgData.tipo || 'texto';
 if (tipoMensaje === 'imagen' || tipoMensaje === 'foto' || tipoMensaje === 'image') {
-    const imageUrl = msgData.url || msgData.referencia_adjunto || msgData.imagenURL || '';
-    contentHTML = `<a href="${imageUrl}" target="_blank">
-                       <img src="${imageUrl}" alt="Foto" loading="lazy">
-                       <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left;">[Ver Imagen]</span>
-                   </a>`;
+    // ✅ AJUSTADO: Lee primero imagenUrl (campo del repartidor), luego alternativas
+    const imageUrl = msgData.imagenUrl || msgData.url || msgData.referencia_adjunto || msgData.imagenURL || msgData.urlImagen || msgData.imagen || '';
+    
+    if (imageUrl && imageUrl.trim() !== '') {
+        contentHTML = `<a href="${imageUrl}" target="_blank" style="text-decoration: none; color: inherit;">
+                           <img src="${imageUrl}" alt="Foto" loading="lazy" style="max-width: 100%; border-radius: 8px; cursor: pointer;" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.textContent='[❌ Error al cargar imagen]';">
+                           <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left; color: #5bc0de;">[📷 Ver Imagen]</span>
+                       </a>`;
+    } else {
+        contentHTML = `<span style="color: #e74c3c;">[❌ Imagen sin URL - Error en envío]</span>`;
+        console.warn('⚠️ Mensaje de imagen sin URL:', msgData);
+    }
 } else if (tipoMensaje === 'audio') {
-    const audioUrl = msgData.url || msgData.referencia_adjunto || msgData.audioURL || '';
-    contentHTML = `<audio controls src="${audioUrl}"></audio>
-                   <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left;">[Reproducir Audio]</span>`;
+    // ✅ AJUSTADO: Lee primero audioUrl (campo del repartidor), luego alternativas
+    const audioUrl = msgData.audioUrl || msgData.url || msgData.referencia_adjunto || msgData.audioURL || msgData.urlAudio || msgData.audio || '';
+    
+    if (audioUrl && audioUrl.trim() !== '') {
+        contentHTML = `<div style="display: flex; flex-direction: column; gap: 5px;">
+                           <audio controls src="${audioUrl}" style="width: 100%; max-width: 300px;" onloadedmetadata="console.log('Audio cargado correctamente')" onerror="console.error('Error al cargar audio:', this.src); this.style.display='none'; this.nextElementSibling.textContent='[❌ Error al cargar audio]';">
+                               Tu navegador no soporta el elemento de audio.
+                           </audio>
+                           <span style="font-size: 11px; color: #5bc0de;">[🎵 Reproducir Audio]</span>
+                       </div>`;
+    } else {
+        contentHTML = `<span style="color: #e74c3c;">[❌ Audio sin URL - Error en envío]</span>`;
+        console.warn('⚠️ Mensaje de audio sin URL:', msgData);
+    }
 } else {
     contentHTML = (msgData.mensaje || msgData.texto || '').replace(/\n/g, '<br>');
 }
