@@ -3,8 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel Domicilios Admin v1.8 MAPA REAL-TIME - CORREGIDO v2.0</title>
-<!-- ARCHIVO CORREGIDO - VERSIÓN 2.0 - FECHA: 28 ENE 2025 -->
+<title>Panel Domicilios Admin v1.9 - MAPA CORREGIDO COMPLETO</title>
+<!-- VERSIÓN FINAL - FECHA: 30 ENE 2025 -->
+<!-- ✅ CORRECCIÓN: Variable ubicacion extraída correctamente -->
+<!-- ✅ MEJORA: Acepta lon y lng en ubicaciones -->
+<!-- ✅ MEJORA: Maneja 3 formatos diferentes de ubicación -->
 <!-- Leaflet CSS para el mapa -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <!--  ERUDA - Consola de Depuracion Movil -->
@@ -1311,9 +1314,41 @@
           } else {
               offlineCount++;
           }
-          console.log(`\n Procesando: ${rep.nombre || repId}`);
-          console.log(`    Estado: ${isOnline ? 'Online' : 'Offline'}`);
-          console.log(`    Datos completos del repartidor:`, rep);
+          console.log(`\n📍 Procesando: ${rep.nombre || repId}`);
+          console.log(`    Estado: ${isOnline ? 'Online' : 'Offline'}`);
+          console.log(`    GPS Activo: ${rep.gpsActivo ? 'SI' : 'NO'}`);
+          console.log(`    Datos completos del repartidor:`, rep);
+          
+          // 🔥 EXTRAER UBICACIÓN DEL REPARTIDOR (acepta lon y lng)
+          let ubicacion = null;
+          
+          // Intentar obtener de ubicacionActual primero (más reciente)
+          if (rep.ubicacionActual && rep.ubicacionActual.lat && (rep.ubicacionActual.lon || rep.ubicacionActual.lng)) {
+              ubicacion = {
+                  lat: rep.ubicacionActual.lat,
+                  lon: rep.ubicacionActual.lon || rep.ubicacionActual.lng,
+                  accuracy: rep.ubicacionActual.accuracy,
+                  timestamp: rep.ubicacionActual.timestamp
+              };
+              console.log(`    ✅ Ubicación obtenida de ubicacionActual:`, ubicacion);
+          } 
+          // Si no, intentar de ubicacion
+          else if (rep.ubicacion && rep.ubicacion.lat && (rep.ubicacion.lon || rep.ubicacion.lng)) {
+              ubicacion = {
+                  lat: rep.ubicacion.lat,
+                  lon: rep.ubicacion.lon || rep.ubicacion.lng
+              };
+              console.log(`    ✅ Ubicación obtenida de ubicacion:`, ubicacion);
+          }
+          // Si no, intentar lat/lon directos (formato muy antiguo)
+          else if (rep.lat && (rep.lon || rep.lng)) {
+              ubicacion = {
+                  lat: rep.lat,
+                  lon: rep.lon || rep.lng
+              };
+              console.log(`    ✅ Ubicación obtenida de lat/lon directos:`, ubicacion);
+          }
+          
           if (ubicacion && ubicacion.lat && ubicacion.lon) {
               const lat = parseFloat(ubicacion.lat);
               const lon = parseFloat(ubicacion.lon);
