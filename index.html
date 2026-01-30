@@ -1977,21 +1977,21 @@ if (msgData.rol_remitente === "Admin" || msgData.remitente === "admin") {
 }
 console.log(`Mensaje: "${msgData.texto?.substring(0, 20)}..." - Tipo: ${tipo} - Rol: ${msgData.rol_remitente}`);
                 const formattedTime = formatTimestamp(msgData.timestamp);
-                let contentHTML = msgData.texto || msgData.mensaje || '';
-                const audioUrl = msgData.url || msgData.referencia_adjunto || msgData.audioURL || '';
-                if (tipoAdjunto === 'foto' || tipoAdjunto === 'image' || tipoAdjunto === 'imagen') {
-                    const imageUrl = msgData.referencia_adjunto || msgData.imagenURL || msgData.texto || msgData.mensaje || '';
-                    contentHTML = `<a href="${imageUrl}" target="_blank">
-                                       <img src="${imageUrl}" alt="Foto" loading="lazy">
-                                       <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left;">[Ver Imagen]</span>
-                                   </a>`;
-                } else if (tipoAdjunto === 'audio') {
-                    const audioUrl = msgData.referencia_adjunto || msgData.audioURL || msgData.texto || msgData.mensaje || '';
-                    contentHTML = `<audio controls src="${audioUrl}"></audio>
-                                   <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left;">[Reproducir Audio]</span>`;
-                } else {
-                    contentHTML = (msgData.texto || msgData.mensaje || '').replace(/\n/g, '<br>');
-                }
+                let contentHTML = msgData.mensaje || msgData.texto || '';
+const tipoMensaje = msgData.tipo || 'texto';
+if (tipoMensaje === 'imagen' || tipoMensaje === 'foto' || tipoMensaje === 'image') {
+    const imageUrl = msgData.url || msgData.referencia_adjunto || msgData.imagenURL || '';
+    contentHTML = `<a href="${imageUrl}" target="_blank">
+                       <img src="${imageUrl}" alt="Foto" loading="lazy">
+                       <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left;">[Ver Imagen]</span>
+                   </a>`;
+} else if (tipoMensaje === 'audio') {
+    const audioUrl = msgData.url || msgData.referencia_adjunto || msgData.audioURL || '';
+    contentHTML = `<audio controls src="${audioUrl}"></audio>
+                   <span style="font-size: 11px; margin-top: 5px; display: block; text-align: left;">[Reproducir Audio]</span>`;
+} else {
+    contentHTML = (msgData.mensaje || msgData.texto || '').replace(/\n/g, '<br>');
+}
                 const div = document.createElement("div");
                 div.className = `mensaje ${tipo}`;
                 div.innerHTML = `
@@ -2740,11 +2740,11 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
                   const montoFormat = monto.toLocaleString('es-ES', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 });
                   const notificacionTexto = `[ADMIN] El pedido #${pedidoKey.substring(0, 4)}... ha sido modificado. Nuevo monto total: ${montoFormat}.`;
                   await push(dbRef(db, `chats/${repartidorId}`), {
-                      remitente: "admin", 
-                      texto: notificacionTexto,
-                      timestamp: Date.now(), 
-                      rol_remitente: "Admin",
-                      tipo: "texto" 
+    remitente: "admin", 
+    mensaje: notificacionTexto,
+    timestamp: Date.now(), 
+    rol_remitente: "Admin",
+    tipo: "texto" 
                   });
               }
           }   
