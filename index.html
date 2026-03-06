@@ -1216,6 +1216,31 @@
     }
   }
 
+  /* ==================== SOPORTE CLIENTES ==================== */
+  .soporte-item {
+    padding: 12px;
+    border-bottom: 1px solid #444;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 8px;
+    margin-bottom: 4px;
+  }
+  .soporte-item:hover { background: #333; }
+  .soporte-item.activo { background: #3a3a1a; border-left: 4px solid #FFD700; }
+  .soporte-item .s-nombre { font-weight: bold; color: #FFD700; font-size: 14px; }
+  .soporte-item .s-preview { color: #999; font-size: 12px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; }
+  .soporte-item .s-badge { background:#ff4444; color:#fff; border-radius:50%; padding:2px 7px; font-size:11px; font-weight:bold; }
+  .soporte-msg-cliente { background:#3a3a3a; color:#f0f0f0; padding:8px 12px; border-radius:12px 12px 12px 0; max-width:75%; align-self:flex-start; font-size:14px; word-wrap:break-word; }
+  .soporte-msg-admin { background:#FFD700; color:#111; padding:8px 12px; border-radius:12px 12px 0 12px; max-width:75%; align-self:flex-end; font-size:14px; word-wrap:break-word; }
+  .soporte-msg-time { font-size:10px; color:#888; margin-top:3px; }
+  /* ==================== PEDIDO HISTORIAL EXPANDIBLE ==================== */
+  .pedido-historial-item { cursor: pointer; transition: background 0.2s; }
+  .pedido-historial-item:hover { background: #3a3a3a !important; }
+  #modalDetallePedido h4 { color: #FFD700; margin: 12px 0 6px 0; font-size:14px; }
+  #modalDetallePedido .det-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #444; font-size:13px; }
+  #modalDetallePedido .det-row span:first-child { color:#999; }
+  #modalDetallePedido .det-row span:last-child { color:#f0f0f0; text-align:right; max-width:65%; }
+
 </style>
 </head>
 <body>
@@ -1241,6 +1266,7 @@
     <button class="tab-btn" data-tab="historialPedidos">📚 Historial</button>
     <button class="tab-btn" data-tab="mapaRepartidores">🗺️ Mapa</button>
     <button class="tab-btn" data-tab="tiendas">🏪 Tiendas</button>
+    <button class="tab-btn" data-tab="soporteClientes" id="tabSoporte">🆘 Soporte <span id="soporte-badge" style="display:none;background:#ff4444;color:#fff;border-radius:50%;padding:2px 7px;font-size:11px;margin-left:4px;font-weight:bold;">0</span></button>
   </div>
 </header>
 <!-- ==================== SECCIÓN: CHATS ==================== -->
@@ -1846,6 +1872,8 @@
           console.log('✅ Usuario autenticado:', user.email);
           DOMElements.loginDiv.style.display = 'none';
           DOMElements.logoutBtn.style.display = 'block';
+          // Iniciar listener de soporte al hacer login
+          iniciarListenerSoporte();
           if (!cleanupExecuted) {
               setTimeout(() => {
                   cleanupOldMessages();
@@ -2654,6 +2682,10 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       if (targetTab === 'historialPedidos') {
           window.mostrarListaRepartidoresHistorial();
       }
+      if (targetTab === 'soporteClientes') {
+          // Refrescar badge al entrar
+          actualizarBadgeSoporte(0);
+      }
       // 🗺️ INICIALIZAR MAPA CUANDO SE ACCEDE A LA PESTAÑA
       if (targetTab === 'mapaRepartidores') {
           if (!mapInitialized) {
@@ -2911,7 +2943,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           const estado = pedido.estado || pedido.estadoHistorial || 'Pendiente';
           const estadoClass = normalizeEstadoClass(estado);
           const estadoTexto = getEstadoTexto(estado);
-          const nombreCliente = pedido.nombreCliente || 'Cliente Desconocido';
+          const nombreCliente = pedido.nombreCliente || pedido.cliente?.clienteNombre || pedido.cliente?.nombre || 'Sin nombre';
           const descripcion = pedido.descripcion || 'Sin descripción';
           const montoTotal = pedido.montoTotal || 0;
           const item = document.createElement("div");
@@ -2945,11 +2977,11 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
               ${timerHTML}
               <div class="detalle-linea">
                   <span>Teléfono:</span>
-                  <span class="valor">${pedido.telefonoCliente || 'N/A'}</span>
+                  <span class="valor">${pedido.telefonoCliente || pedido.cliente?.clienteTelefono || 'N/A'}</span>
               </div>
               <div class="detalle-linea">
                   <span>Dirección:</span>
-                  <span class="valor">${pedido.direccionCliente || 'N/A'}</span>
+                  <span class="valor">${pedido.direccionCliente || pedido.cliente?.clienteDireccion || 'N/A'}</span>
               </div>
               <div class="detalle-linea">
                   <span>Descripción:</span>
@@ -2959,8 +2991,14 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
                   <span>Hora de Asignación:</span>
                   <span style="font-size: 11px; color: #A0A0A0;">${dateAsignacion}</span>
               </div>
+              <div style="text-align:right;margin-top:6px;font-size:11px;color:#888;">👆 Toca para ver info completa</div>
               ${actionContainer}
-          `; 
+          `;
+          // Click en la tarjeta abre modal de detalle (pero no si se clickea un botón de acción)
+          item.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
+            window.abrirDetallePedido(pedido);
+          });
           DOMElements.listaHistorialPedidos.appendChild(item);
       });
   }
@@ -3719,6 +3757,246 @@ return alert("Error: El pedido original no se encontró.");
 
 
   console.log('');
+
+  // ══════════════════════════════════════════════════════════════
+  // 🆘 SISTEMA DE SOPORTE CLIENTES → ADMIN
+  // ══════════════════════════════════════════════════════════════
+  let soporteClienteActivo = null;
+  let soporteListenerRef = null;
+  let soporteListenerGlobal = null;
+  let soporteNoLeidos = {};
+
+  // Escuchar TODOS los chats de soporte en tiempo real
+  function iniciarListenerSoporte() {
+    if (!auth.currentUser) return;
+    soporteListenerGlobal = onValue(dbRef(db, 'soporte_cliente'), async snapshot => {
+      const data = snapshot.val();
+      const lista = document.getElementById('listaSoporte');
+      if (!lista) return;
+
+      if (!data) {
+        lista.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">No hay chats de soporte aún.</p>';
+        actualizarBadgeSoporte(0);
+        return;
+      }
+
+      // Construir lista de usuarios
+      const userIds = Object.keys(data);
+      let totalNoLeidos = 0;
+      const items = [];
+
+      for (const userId of userIds) {
+        const mensajes = Object.values(data[userId] || {});
+        mensajes.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
+        const ultimo = mensajes[mensajes.length - 1];
+        const noLeidos = mensajes.filter(m => m.remitente !== 'admin' && !m.leido).length;
+        totalNoLeidos += noLeidos;
+
+        // Obtener nombre del cliente
+        let nombreUsuario = userId.replace('cliente_auth_','').substring(0,10)+'...';
+        try {
+          const uidLimpio = userId.replace('cliente_auth_','');
+          const snap = await get(dbRef(db, `usuarios/${userId}`))
+            || await get(dbRef(db, `usuarios/${uidLimpio}`))
+            || await get(dbRef(db, `users/${userId}`));
+          if (snap && snap.exists()) {
+            const d = snap.val();
+            nombreUsuario = d.nombre || d.email || nombreUsuario;
+          }
+        } catch(e) {}
+
+        items.push({ userId, nombreUsuario, ultimo, noLeidos, mensajes });
+      }
+
+      // Ordenar: más reciente arriba, no leídos primero
+      items.sort((a,b) => {
+        if (a.noLeidos !== b.noLeidos) return b.noLeidos - a.noLeidos;
+        return (b.ultimo?.timestamp||0) - (a.ultimo?.timestamp||0);
+      });
+
+      lista.innerHTML = '';
+      items.forEach(({ userId, nombreUsuario, ultimo, noLeidos }) => {
+        const div = document.createElement('div');
+        div.className = 'soporte-item' + (soporteClienteActivo === userId ? ' activo' : '');
+        div.setAttribute('data-uid', userId);
+        const preview = ultimo ? (ultimo.mensaje || (ultimo.imagenURL ? '📷 Imagen' : ultimo.audioURL ? '🎙️ Audio' : '...')) : 'Sin mensajes';
+        div.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="s-nombre">👤 ${nombreUsuario}</span>
+            ${noLeidos > 0 ? `<span class="s-badge">${noLeidos}</span>` : ''}
+          </div>
+          <div class="s-preview">${preview}</div>
+        `;
+        div.addEventListener('click', () => abrirSoporteChat(userId, nombreUsuario));
+        lista.appendChild(div);
+      });
+
+      actualizarBadgeSoporte(totalNoLeidos);
+
+      // Si hay un chat activo, refrescar vista
+      if (soporteClienteActivo && data[soporteClienteActivo]) {
+        mostrarMensajesSoporte(Object.values(data[soporteClienteActivo]));
+      }
+    });
+  }
+
+  function actualizarBadgeSoporte(n) {
+    const badge = document.getElementById('soporte-badge');
+    if (!badge) return;
+    if (n > 0) { badge.style.display = 'inline'; badge.textContent = n; }
+    else { badge.style.display = 'none'; }
+  }
+
+  function abrirSoporteChat(userId, nombre) {
+    soporteClienteActivo = userId;
+    document.getElementById('soporteChatTitulo').textContent = '💬 ' + nombre;
+    document.getElementById('soporteChatPanel').style.display = 'flex';
+    document.getElementById('soporteChatPanel').style.flexDirection = 'column';
+
+    // Marcar activo en lista
+    document.querySelectorAll('.soporte-item').forEach(el => {
+      el.classList.toggle('activo', el.getAttribute('data-uid') === userId);
+    });
+
+    // Cargar mensajes en tiempo real
+    if (soporteListenerRef) off(soporteListenerRef);
+    soporteListenerRef = dbRef(db, `soporte_cliente/${userId}`);
+    onValue(soporteListenerRef, snapshot => {
+      const msgs = [];
+      if (snapshot.exists()) {
+        snapshot.forEach(child => msgs.push({ id: child.key, ...child.val() }));
+      }
+      mostrarMensajesSoporte(msgs);
+
+      // Marcar como leídos
+      msgs.forEach(msg => {
+        if (msg.remitente !== 'admin' && !msg.leido) {
+          update(dbRef(db, `soporte_cliente/${userId}/${msg.id}`), { leido: true }).catch(()=>{});
+        }
+      });
+    });
+  }
+
+  function mostrarMensajesSoporte(msgs) {
+    const area = document.getElementById('soporteMensajesArea');
+    if (!area) return;
+    msgs.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
+    area.innerHTML = '';
+    if (msgs.length === 0) {
+      area.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">Sin mensajes aún.</p>';
+      return;
+    }
+    msgs.forEach(msg => {
+      const isAdmin = msg.remitente === 'admin';
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `display:flex;flex-direction:column;align-items:${isAdmin?'flex-end':'flex-start'};`;
+      const bubble = document.createElement('div');
+      bubble.className = isAdmin ? 'soporte-msg-admin' : 'soporte-msg-cliente';
+      let contenido = '';
+      if (msg.tipo === 'imagen' && msg.imagenURL) {
+        contenido = `<img src="${msg.imagenURL}" style="max-width:180px;border-radius:8px;cursor:pointer;" onclick="window.open('${msg.imagenURL}','_blank')"><br>`;
+      } else if (msg.tipo === 'audio' && msg.audioURL) {
+        contenido = `<audio controls src="${msg.audioURL}" style="max-width:200px;"></audio><br>`;
+      }
+      contenido += msg.mensaje || '';
+      bubble.innerHTML = contenido;
+      const tiempo = document.createElement('div');
+      tiempo.className = 'soporte-msg-time';
+      tiempo.style.textAlign = isAdmin ? 'right' : 'left';
+      tiempo.textContent = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}) : '';
+      wrapper.appendChild(bubble);
+      wrapper.appendChild(tiempo);
+      area.appendChild(wrapper);
+    });
+    area.scrollTop = area.scrollHeight;
+  }
+
+  window.cerrarSoporteChat = function() {
+    soporteClienteActivo = null;
+    document.getElementById('soporteChatPanel').style.display = 'none';
+    document.querySelectorAll('.soporte-item').forEach(el => el.classList.remove('activo'));
+    if (soporteListenerRef) { off(soporteListenerRef); soporteListenerRef = null; }
+  }
+
+  window.enviarRespuestaSoporte = async function() {
+    const input = document.getElementById('soporteInputAdmin');
+    const texto = input.value.trim();
+    if (!texto || !soporteClienteActivo) return;
+    try {
+      const ref2 = dbRef(db, `soporte_cliente/${soporteClienteActivo}`);
+      await push(ref2, {
+        mensaje: texto,
+        remitente: 'admin',
+        tipo: 'texto',
+        timestamp: Date.now(),
+        leido: true
+      });
+      input.value = '';
+    } catch(e) {
+      alert('Error al enviar: ' + e.message);
+    }
+  }
+
+  // Enter para enviar en soporte
+  document.getElementById('soporteInputAdmin')?.addEventListener('keypress', e => {
+    if (e.key === 'Enter') window.enviarRespuestaSoporte();
+  });
+
+  // Activar listener de soporte al hacer login
+  const _origOnAuthState = window._origOnAuthState;
+
+  // ══════════════════════════════════════════════════════════════
+  // 📋 TARJETAS DE PEDIDO EXPANDIBLES CON INFO COMPLETA
+  // ══════════════════════════════════════════════════════════════
+  window.abrirDetallePedido = function(pedido) {
+    const modal = document.getElementById('modalDetallePedido');
+    const contenido = document.getElementById('modalDetallePedidoContenido');
+
+    // Combinar campos de diferentes fuentes
+    const nombre   = pedido.nombreCliente   || pedido.cliente?.clienteNombre   || pedido.cliente?.nombre   || 'Sin nombre';
+    const telefono = pedido.telefonoCliente || pedido.cliente?.clienteTelefono || pedido.cliente?.telefono || 'Sin teléfono';
+    const email    = pedido.cliente?.clienteEmail || pedido.cliente?.correo     || pedido.email            || '—';
+    const direccion= pedido.direccionCliente|| pedido.cliente?.clienteDireccion|| pedido.cliente?.direccion|| 'Sin dirección';
+    const descripcion = pedido.descripcion  || 'Sin descripción';
+    const estado   = pedido.estado          || pedido.estadoHistorial           || 'Pendiente';
+    const monto    = pedido.montoTotal       || pedido.total                    || 0;
+    const rep      = pedido.repartidorNombre || '—';
+    const fechaCreacion  = pedido.timestampCreacion  ? new Date(pedido.timestampCreacion).toLocaleString('es-CO')  : '—';
+    const fechaAsignacion= pedido.timestampAsignacion? new Date(pedido.timestampAsignacion).toLocaleString('es-CO'): '—';
+    const fechaAceptado  = pedido.timestampAceptado  ? new Date(pedido.timestampAceptado).toLocaleString('es-CO')  : '—';
+
+    const estadoColors = { completado:'#27ae60', cancelado:'#e74c3c', pendiente:'#ffa500', 'en camino':'#3498db' };
+    const estadoColor = estadoColors[estado.toLowerCase()] || '#FFD700';
+
+    contenido.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+        <h3 style="margin:0;color:#FFD700;font-size:16px;">📦 Detalle del Pedido</h3>
+        <span style="background:${estadoColor};color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;">${estado}</span>
+      </div>
+      <h4>👤 Cliente</h4>
+      <div class="det-row"><span>Nombre:</span><span>${nombre}</span></div>
+      <div class="det-row"><span>Teléfono:</span><span><a href="tel:${telefono}" style="color:#4A9EFF;">${telefono}</a></span></div>
+      <div class="det-row"><span>Email:</span><span>${email}</span></div>
+      <div class="det-row"><span>Dirección:</span><span>${direccion}</span></div>
+      <h4>🚴 Pedido</h4>
+      <div class="det-row"><span>Descripción:</span><span>${descripcion}</span></div>
+      <div class="det-row"><span>Monto:</span><span style="color:#FFD700;font-weight:bold;">$${(typeof monto==='number'?monto.toLocaleString('es-ES'):monto)}</span></div>
+      <div class="det-row"><span>Repartidor:</span><span>${rep}</span></div>
+      <h4>🕒 Tiempos</h4>
+      <div class="det-row"><span>Creado:</span><span>${fechaCreacion}</span></div>
+      <div class="det-row"><span>Asignado:</span><span>${fechaAsignacion}</span></div>
+      <div class="det-row"><span>Aceptado:</span><span>${fechaAceptado}</span></div>
+    `;
+    modal.style.display = 'block';
+  }
+
+  window.cerrarDetallePedido = function() {
+    document.getElementById('modalDetallePedido').style.display = 'none';
+  }
+  document.getElementById('modalDetallePedido')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('modalDetallePedido')) cerrarDetallePedido();
+  });
+
 </script>
 
 <!-- ==================== MODAL: AGREGAR PRODUCTO ==================== -->
@@ -3731,6 +4009,39 @@ return alert("Error: El pedido original no se encontró.");
       <button type="submit" class="btn-guardar-producto">Agregar</button>
       <button type="button" class="btn-cancelar-producto" onclick="cerrarModalProducto()">Cancelar</button>
     </form>
+  </div>
+</div>
+
+<!-- ==================== SECCIÓN: SOPORTE CLIENTES ==================== -->
+<section id="soporteClientes">
+  <h2 style="margin-top:0;margin-bottom:10px;">🆘 Soporte para Pedidos</h2>
+  <div style="display:flex;gap:20px;flex-grow:1;" id="soporteLayout">
+    <!-- Lista de usuarios con soporte -->
+    <div style="flex:1;min-width:220px;">
+      <div id="listaSoporte" style="background:#2C2C2C;padding:10px;border-radius:10px;min-height:400px;">
+        <p style="color:#888;text-align:center;padding:20px;">Cargando chats de soporte...</p>
+      </div>
+    </div>
+    <!-- Chat activo -->
+    <div id="soporteChatPanel" style="flex:2;display:none;flex-direction:column;background:#2C2C2C;padding:15px;border-radius:10px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;border-bottom:1px solid #444;padding-bottom:10px;">
+        <button onclick="cerrarSoporteChat()" style="background:none;border:none;color:#FFD700;font-size:22px;cursor:pointer;padding:0;">←</button>
+        <h3 id="soporteChatTitulo" style="margin:0;color:#FFD700;font-size:16px;">Chat de soporte</h3>
+      </div>
+      <div id="soporteMensajesArea" style="flex-grow:1;overflow-y:auto;min-height:350px;max-height:500px;background:#1A1A1A;padding:15px;border-radius:8px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;"></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="soporteInputAdmin" placeholder="Escribe una respuesta..." style="flex:1;padding:10px;border-radius:20px;border:1px solid #555;background:#444;color:#fff;font-size:14px;">
+        <button onclick="enviarRespuestaSoporte()" style="padding:10px 18px;background:#FFD700;color:#111;border:none;border-radius:20px;font-weight:bold;cursor:pointer;white-space:nowrap;">Enviar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== MODAL: DETALLE PEDIDO HISTORIAL ==================== -->
+<div id="modalDetallePedido" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;overflow-y:auto;">
+  <div style="background:#2C2C2C;margin:5% auto;padding:25px;border-radius:15px;max-width:480px;width:90%;position:relative;border:1px solid #444;">
+    <button onclick="cerrarDetallePedido()" style="position:absolute;top:12px;right:15px;background:#555;border:none;color:#fff;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer;line-height:1;">✕</button>
+    <div id="modalDetallePedidoContenido"></div>
   </div>
 </div>
 
