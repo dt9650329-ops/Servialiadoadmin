@@ -2990,6 +2990,13 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
                   <span>Descripción:</span>
                   <span class="valor">${descripcion}</span>
               </div>
+              ${pedido.esFuera ? `<div class="detalle-linea" style="border-left:2px solid #e67e22;padding-left:6px;">
+                  <span>Destino:</span>
+                  <span class="valor" style="color:#e67e22;">🌄 ${pedido.municipioNombre||pedido.municipioId||'Fuera'} ${pedido.kmVia ? 'Km '+pedido.kmVia : ''} ${pedido.veredaNombre||''}</span>
+              </div>` : `<div class="detalle-linea">
+                  <span>Entrega:</span>
+                  <span class="valor">${pedido.barrioEntrega||pedido.zonaEntrega||'—'}</span>
+              </div>`}
               <div class="detalle-linea" style="margin-top: 5px;">
                   <span>Hora de Asignación:</span>
                   <span style="font-size: 11px; color: #A0A0A0;">${dateAsignacion}</span>
@@ -3981,6 +3988,12 @@ return alert("Error: El pedido original no se encontró.");
       <div class="det-row"><span>Teléfono:</span><span><a href="tel:${telefono}" style="color:#4A9EFF;">${telefono}</a></span></div>
       <div class="det-row"><span>Email:</span><span>${email}</span></div>
       <div class="det-row"><span>Dirección:</span><span>${direccion}</span></div>
+      ${pedido.esFuera ? `<div style="background:#1a1200;border:1px solid #e67e22;border-radius:8px;padding:8px 12px;margin-bottom:10px;">
+        <span style="color:#e67e22;font-weight:bold;">🌄 Servicio fuera de Armenia</span>
+        <span style="color:#aaa;font-size:12px;margin-left:8px;">Destino: ${pedido.municipioNombre||pedido.municipioId||'—'}</span>
+        ${pedido.kmVia ? `<span style="color:#aaa;font-size:12px;"> · Km ${pedido.kmVia}</span>` : ''}
+        ${pedido.veredaNombre ? `<span style="color:#aaa;font-size:12px;"> · ${pedido.veredaNombre}</span>` : ''}
+      </div>` : ''}
       <h4 style="color:#FFC300;border-bottom:1px solid #444;padding-bottom:5px;">📦 Punto A – Recogida</h4>
       <div class="det-row"><span>Nombre:</span><span>${pedido.nombreEntrega||'—'}</span></div>
       <div class="det-row"><span>Dirección:</span><span>${pedido.dirRecogida||direccion}</span></div>
@@ -3992,9 +4005,15 @@ return alert("Error: El pedido original no se encontró.");
       <div class="det-row"><span>Nombre:</span><span>${pedido.nombreRecibe||nombre}</span></div>
       <div class="det-row"><span>Dirección:</span><span>${pedido.dirEntrega||'—'}</span></div>
       <div class="det-row"><span>Teléfono:</span><span>${pedido.telRecibe||telefono}</span></div>
+      ${pedido.esFuera ? `
+      <div class="det-row"><span>Municipio:</span><span style="color:#e67e22;font-weight:bold;">🌄 ${pedido.municipioNombre||pedido.municipioId||'Fuera de Armenia'}</span></div>
+      ${pedido.kmVia ? '<div class="det-row"><span>Kilómetro:</span><span>Km ' + pedido.kmVia + '</span></div>' : ''}
+      ${pedido.veredaNombre ? '<div class="det-row"><span>Vereda/Finca:</span><span>' + pedido.veredaNombre + '</span></div>' : ''}
+      ` : `
       <div class="det-row"><span>Barrio:</span><span style="color:#4A9EFF;font-weight:bold;">${pedido.barrioEntrega||'—'}</span></div>
       <div class="det-row"><span>Comuna:</span><span>${pedido.comunaEntrega||'—'}</span></div>
       <div class="det-row"><span>Zona:</span><span>${pedido.zonaEntrega||'—'}</span></div>
+      `}
       <h4 style="color:#aaa;border-bottom:1px solid #444;padding-bottom:5px;">🚴 Pedido</h4>
       <div class="det-row"><span>Descripción:</span><span>${descripcion}</span></div>
       <div class="det-row"><span>Monto:</span><span style="color:#FFD700;font-weight:bold;">$${(typeof monto==='number'?monto.toLocaleString('es-ES'):monto)}</span></div>
@@ -4121,32 +4140,110 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
 
 <!-- ==================== SECCIÓN: BARRIOS ==================== -->
 <section id="barriosSection">
-  <h2 style="margin-top:0;margin-bottom:15px;">🗺️ Barrios de Armenia — 312 barrios oficiales</h2>
-  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-    <input type="text" id="filtro-barrio-admin" placeholder="🔍 Buscar barrio..." oninput="filtrarBarriosAdmin()" style="flex:1;min-width:180px;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;"/>
-    <select id="filtro-zona-admin" onchange="filtrarBarriosAdmin()" style="background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;">
-      <option value="">Todas las zonas</option>
-      <option value="sur">🔴 Sur</option>
-      <option value="centro">🟡 Centro</option>
-      <option value="norte">🔵 Norte</option>
-      <option value="oriente">🟠 Oriente</option>
-      <option value="occidente">🟣 Occidente</option>
-    </select>
-    <select id="filtro-comuna-admin" onchange="filtrarBarriosAdmin()" style="background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;">
-      <option value="">Todas las comunas</option>
-      <option value="1">C1 - Centenario</option>
-      <option value="2">C2 - Rufino José Cuervo Sur</option>
-      <option value="3">C3 - Alfonso López</option>
-      <option value="4">C4 - Francisco de Paula Santander</option>
-      <option value="5">C5 - El Bosque</option>
-      <option value="6">C6 - San José</option>
-      <option value="7">C7 - Cafetero</option>
-      <option value="8">C8 - Libertadores</option>
-      <option value="9">C9 - Fundadores</option>
-      <option value="10">C10 - Quimbaya</option>
-    </select>
-    <button onclick="abrirModalAgregarBarrio()" style="background:#FFC300;color:#000;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;">➕ Agregar Barrio</button>
-    <button onclick="subirBarriosFirebase()" id="btn-subir-barrios" style="background:#2a2a2a;color:#aaa;border:1px solid #444;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:13px;" title="Carga inicial de los 312 barrios base">📤 Carga inicial (312)</button>
+  <h2 style="margin-top:0;margin-bottom:12px;">🗺️ Gestión de Barrios y Ubicaciones</h2>
+
+  <!-- TABS INTERNOS -->
+  <div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:2px solid #333;padding-bottom:0;">
+    <button id="sub-tab-armenia" onclick="cambiarSubTab('armenia')"
+      style="padding:9px 16px;border:none;border-radius:8px 8px 0 0;background:#FFC300;color:#000;font-weight:bold;cursor:pointer;font-size:13px;">
+      🏙️ Barrios Armenia
+    </button>
+    <button id="sub-tab-fuera" onclick="cambiarSubTab('fuera')"
+      style="padding:9px 16px;border:none;border-radius:8px 8px 0 0;background:#2a2a2a;color:#aaa;font-weight:bold;cursor:pointer;font-size:13px;">
+      🌄 Fuera de Armenia <span id="badge-fuera" style="display:none;background:#e67e22;color:#fff;border-radius:8px;padding:1px 6px;font-size:11px;margin-left:4px;"></span>
+    </button>
+  </div>
+
+  <!-- PANEL BARRIOS ARMENIA -->
+  <div id="panel-armenia">
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+      <input type="text" id="filtro-barrio-admin" placeholder="🔍 Buscar barrio..." oninput="filtrarBarriosAdmin()" style="flex:1;min-width:180px;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;"/>
+      <select id="filtro-zona-admin" onchange="filtrarBarriosAdmin()" style="background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;">
+        <option value="">Todas las zonas</option>
+        <option value="sur">🔴 Sur</option>
+        <option value="centro">🟡 Centro</option>
+        <option value="norte">🔵 Norte</option>
+        <option value="oriente">🟠 Oriente</option>
+        <option value="occidente">🟣 Occidente</option>
+      </select>
+      <select id="filtro-comuna-admin" onchange="filtrarBarriosAdmin()" style="background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;">
+        <option value="">Todas las comunas</option>
+        <option value="1">C1 - Centenario</option>
+        <option value="2">C2 - Rufino José Cuervo Sur</option>
+        <option value="3">C3 - Alfonso López</option>
+        <option value="4">C4 - Francisco de Paula Santander</option>
+        <option value="5">C5 - El Bosque</option>
+        <option value="6">C6 - San José</option>
+        <option value="7">C7 - Cafetero</option>
+        <option value="8">C8 - Libertadores</option>
+        <option value="9">C9 - Fundadores</option>
+        <option value="10">C10 - Quimbaya</option>
+      </select>
+      <button onclick="abrirModalAgregarBarrio()" style="background:#FFC300;color:#000;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;">➕ Agregar Barrio</button>
+      <button onclick="subirBarriosFirebase()" id="btn-subir-barrios" style="background:#2a2a2a;color:#aaa;border:1px solid #444;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:13px;" title="Carga inicial de los 312 barrios base">📤 Carga inicial (312)</button>
+    </div>
+  </div>
+
+  <!-- PANEL FUERA DE ARMENIA -->
+  <div id="panel-fuera" style="display:none;">
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+      <input type="text" id="filtro-fuera-admin" placeholder="🔍 Buscar municipio, vereda, finca..." oninput="filtrarFueraAdmin()" style="flex:1;min-width:200px;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;"/>
+      <button onclick="abrirModalAgregarFuera()" style="background:#e67e22;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;">🌄 Agregar Ubicación</button>
+    </div>
+    <div id="stats-fuera" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
+    <div id="tabla-fuera-admin" style="background:#222;border-radius:10px;overflow:hidden;max-height:600px;overflow-y:auto;">
+      <p style="color:#888;text-align:center;padding:20px;">Cargando ubicaciones...</p>
+    </div>
+  </div>
+
+  <!-- MODAL AGREGAR UBICACIÓN FUERA -->
+  <div id="modal-agregar-fuera" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:9999;overflow-y:auto;">
+    <div style="background:#2a2a2a;margin:6% auto;padding:24px;border-radius:14px;max-width:440px;width:92%;border:1px solid #e67e22;">
+      <h3 style="color:#e67e22;margin:0 0 16px;">🌄 Agregar Ubicación Fuera de Armenia</h3>
+      <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Nombre del lugar</label>
+      <input type="text" id="fuera-nombre" placeholder="Ej: Km 5 vía Montenegro, Finca El Remanso, Vereda La Siria" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;"/>
+      <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Tipo</label>
+      <select id="fuera-tipo" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;">
+        <option value="municipio">🏘️ Municipio (Calarcá, Montenegro, etc.)</option>
+        <option value="via">🛣️ Vía / Kilómetro de carretera</option>
+        <option value="vereda">🌿 Vereda</option>
+        <option value="finca">🏡 Finca / Predio</option>
+        <option value="corregimiento">🏠 Corregimiento</option>
+        <option value="otro">📍 Otro</option>
+      </select>
+      <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Municipio o zona de referencia</label>
+      <select id="fuera-municipio-ref" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;">
+        <option value="">-- Selecciona --</option>
+        <option value="calarca">Calarcá</option>
+        <option value="circasia">Circasia</option>
+        <option value="montenegro">Montenegro</option>
+        <option value="tebaida">La Tebaida</option>
+        <option value="puerto_tapao">Puerto Tapao</option>
+        <option value="salento">Salento</option>
+        <option value="quimbaya">Quimbaya</option>
+        <option value="filandia">Filandia</option>
+        <option value="buenavista">Buenavista</option>
+        <option value="pijao">Pijao</option>
+        <option value="genova">Génova</option>
+        <option value="cordoba">Córdoba</option>
+        <option value="otro">Otro municipio</option>
+      </select>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Latitud (opcional)</label>
+          <input type="number" step="0.000001" id="fuera-lat" placeholder="Ej: 4.5339" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:13px;box-sizing:border-box;"/>
+        </div>
+        <div style="flex:1;">
+          <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Longitud (opcional)</label>
+          <input type="number" step="0.000001" id="fuera-lng" placeholder="Ej: -75.6811" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:13px;box-sizing:border-box;"/>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="guardarUbicacionFuera()" style="flex:1;background:#e67e22;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:15px;">💾 Guardar</button>
+        <button onclick="document.getElementById('modal-agregar-fuera').style.display='none'" style="background:#555;color:#fff;border:none;padding:12px 16px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
+      </div>
+      <p id="msg-agregar-fuera" style="text-align:center;margin-top:10px;font-size:13px;display:none;"></p>
+    </div>
   </div>
 
   <!-- MODAL AGREGAR BARRIO -->
@@ -4318,6 +4415,149 @@ window.filtrarBarriosAdmin = function() {
 
 // ── SUBIR BARRIOS A FIREBASE ────────────────────────────────
 // ── MODAL AGREGAR BARRIO ───────────────────────────────────
+
+// ── SUB-TABS BARRIOS ───────────────────────────────────────
+window.cambiarSubTab = function(tab) {
+  const btnArm  = document.getElementById('sub-tab-armenia');
+  const btnFuera= document.getElementById('sub-tab-fuera');
+  const panArm  = document.getElementById('panel-armenia');
+  const panFuera= document.getElementById('panel-fuera');
+
+  if (tab === 'armenia') {
+    btnArm.style.background = '#FFC300'; btnArm.style.color = '#000';
+    btnFuera.style.background = '#2a2a2a'; btnFuera.style.color = '#aaa';
+    panArm.style.display = 'block'; panFuera.style.display = 'none';
+  } else {
+    btnFuera.style.background = '#e67e22'; btnFuera.style.color = '#fff';
+    btnArm.style.background = '#2a2a2a'; btnArm.style.color = '#aaa';
+    panArm.style.display = 'none'; panFuera.style.display = 'block';
+    cargarUbicacionesFuera();
+  }
+};
+
+// ── GESTIÓN UBICACIONES FUERA ──────────────────────────────
+let _ubicFueraCache = [];
+
+function cargarUbicacionesFuera() {
+  if (!window.db) return;
+  onValue(dbRef(db, 'barrios'), snap => {
+    const data = snap.val() || {};
+    _ubicFueraCache = Object.entries(data)
+      .filter(([,v]) => v.zona === 'fuera' || v.comuna === 'ext')
+      .map(([id,v]) => ({id, ...v}));
+
+    const badge = document.getElementById('badge-fuera');
+    badge.textContent = _ubicFueraCache.length;
+    badge.style.display = _ubicFueraCache.length ? 'inline' : 'none';
+
+    renderTablaFuera(_ubicFueraCache);
+  }, { onlyOnce: true });
+}
+
+function renderTablaFuera(lista) {
+  const tabla = document.getElementById('tabla-fuera-admin');
+  const stats  = document.getElementById('stats-fuera');
+  if (!tabla) return;
+
+  // Stats por tipo
+  const tipos = {};
+  lista.forEach(b => { const t = b.tipo||'otro'; tipos[t]=(tipos[t]||0)+1; });
+  const tipoEmoji = {municipio:'🏘️',via:'🛣️',vereda:'🌿',finca:'🏡',corregimiento:'🏠',otro:'📍'};
+  stats.innerHTML = Object.entries(tipos).map(([t,n]) =>
+    `<span style="background:#2a1200;border:1px solid #e67e22;color:#e67e22;padding:4px 10px;border-radius:16px;font-size:12px;">${tipoEmoji[t]||'📍'} ${t}: ${n}</span>`
+  ).join('') + `<span style="background:#333;color:#aaa;padding:4px 10px;border-radius:16px;font-size:12px;">Total: ${lista.length}</span>`;
+
+  if (!lista.length) {
+    tabla.innerHTML = '<p style="color:#888;text-align:center;padding:30px;">No hay ubicaciones fuera de Armenia aún.<br><small>Usa "🌄 Agregar Ubicación" para agregar la primera.</small></p>';
+    return;
+  }
+
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:#2a1200;position:sticky;top:0;">
+      <th style="padding:10px;text-align:left;color:#e67e22;">#</th>
+      <th style="padding:10px;text-align:left;color:#e67e22;">Nombre</th>
+      <th style="padding:10px;text-align:left;color:#e67e22;">Tipo</th>
+      <th style="padding:10px;text-align:left;color:#e67e22;">Referencia</th>
+      <th style="padding:10px;text-align:left;color:#e67e22;">GPS</th>
+      <th style="padding:10px;color:#e67e22;">Acción</th>
+    </tr></thead><tbody>`;
+
+  lista.forEach((b, i) => {
+    const gps = b.lat && b.lng
+      ? `<a href="https://www.google.com/maps?q=${b.lat},${b.lng}" target="_blank" style="color:#4A9EFF;font-size:11px;">📍 Ver</a>`
+      : '<span style="color:#666;font-size:11px;">Sin GPS</span>';
+    html += `<tr style="border-bottom:1px solid #333;${i%2===0?'background:#1a1a1a':'background:#222'}">
+      <td style="padding:8px;color:#666;">${i+1}</td>
+      <td style="padding:8px;color:#fff;font-weight:bold;">${b.nombre||'—'}</td>
+      <td style="padding:8px;"><span style="background:#2a1200;color:#e67e22;padding:2px 8px;border-radius:8px;font-size:11px;">${(b.tipo||'otro')}</span></td>
+      <td style="padding:8px;color:#aaa;font-size:12px;">${b.municipioRef||b.nombreComuna||'—'}</td>
+      <td style="padding:8px;">${gps}</td>
+      <td style="padding:8px;text-align:center;">
+        <button onclick="eliminarUbicacionFuera('${b.id}')" style="background:#c0392b;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  tabla.innerHTML = html;
+}
+
+window.filtrarFueraAdmin = function() {
+  const q = (document.getElementById('filtro-fuera-admin')?.value||'').toLowerCase();
+  renderTablaFuera(q ? _ubicFueraCache.filter(b => (b.nombre||'').toLowerCase().includes(q)) : _ubicFueraCache);
+};
+
+window.abrirModalAgregarFuera = function() {
+  document.getElementById('modal-agregar-fuera').style.display = 'block';
+  document.getElementById('msg-agregar-fuera').style.display = 'none';
+};
+
+window.guardarUbicacionFuera = async function() {
+  const nombre  = document.getElementById('fuera-nombre').value.trim();
+  const tipo    = document.getElementById('fuera-tipo').value;
+  const munRef  = document.getElementById('fuera-municipio-ref').value;
+  const lat     = parseFloat(document.getElementById('fuera-lat').value) || null;
+  const lng     = parseFloat(document.getElementById('fuera-lng').value) || null;
+  const msg     = document.getElementById('msg-agregar-fuera');
+
+  if (!nombre) {
+    msg.textContent = '⚠️ Ingresa el nombre del lugar.';
+    msg.style.color = '#e74c3c'; msg.style.display = 'block'; return;
+  }
+
+  const id = 'ext_' + nombre.toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'_').slice(0,25)+'_'+Date.now().toString().slice(-4);
+
+  try {
+    msg.textContent = '⏳ Guardando...';
+    msg.style.color = '#FFC300'; msg.style.display = 'block';
+    await set(dbRef(db, 'barrios/' + id), {
+      nombre, tipo, zona: 'fuera', comuna: 'ext',
+      nombreComuna: 'Fuera de Armenia',
+      municipioRef: munRef || '',
+      lat: lat || null, lng: lng || null,
+      activo: true, agregadoPor: 'admin', fecha: Date.now()
+    });
+    msg.textContent = '✅ Ubicación guardada.';
+    msg.style.color = '#27ae60';
+    setTimeout(() => {
+      document.getElementById('modal-agregar-fuera').style.display = 'none';
+      document.getElementById('fuera-nombre').value = '';
+      cargarUbicacionesFuera();
+    }, 1200);
+  } catch(e) {
+    msg.textContent = '❌ Error: ' + e.message;
+    msg.style.color = '#e74c3c';
+  }
+};
+
+window.eliminarUbicacionFuera = async function(id) {
+  if (!confirm('¿Eliminar esta ubicación?')) return;
+  try {
+    await remove(dbRef(db, 'barrios/' + id));
+    cargarUbicacionesFuera();
+  } catch(e) { alert('Error: ' + e.message); }
+};
+
 window.abrirModalAgregarBarrio = function() {
   document.getElementById('modal-agregar-barrio').style.display = 'block';
   document.getElementById('nuevo-barrio-nombre').focus();
