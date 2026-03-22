@@ -1267,6 +1267,7 @@
     <button class="tab-btn" data-tab="mapaRepartidores">🗺️ Mapa</button>
     <button class="tab-btn" data-tab="tiendas">🏪 Tiendas</button>
     <button class="tab-btn" data-tab="soporteClientes" id="tabSoporte">🆘 Soporte <span id="soporte-badge" style="display:none;background:#ff4444;color:#fff;border-radius:50%;padding:2px 7px;font-size:11px;margin-left:4px;font-weight:bold;">0</span></button>
+    <button class="tab-btn" data-tab="barriosSection">🗺️ Barrios</button>
   </div>
 </header>
 <!-- ==================== SECCIÓN: CHATS ==================== -->
@@ -1450,6 +1451,11 @@
   };
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
+  window.db = db;
+  window.dbRef = dbRef;
+  window.dbSet = set;
+  window.dbGet = get;
+  window.dbUpdate = update;
   const auth = getAuth(app);
   const storage = getStorage(app); 
   // ==================== VARIABLES GLOBALES ====================
@@ -1576,7 +1582,11 @@
           console.log(`✅ Limpieza completada: ${totalMessagesDeleted} mensajes eliminados de ${totalChatsProcessed} chats`);
           cleanupExecuted = true;
       } catch (error) {
-          console.error('❌ Error durante la limpieza de mensajes:', error);
+          // Silenciar errores de permisos en limpieza — no crítico
+          if (error.code !== 'PERMISSION_DENIED') {
+              console.warn('⚠️ Limpieza de mensajes omitida:', error.code || error.message);
+          }
+          cleanupExecuted = true; // Marcar como ejecutado para no reintentar
       }
   }
   // ==================== FUNCIONES DEL MAPA ====================
@@ -1886,28 +1896,13 @@
           
           // FORZAR ACTUALIZACIÓN DEL LISTENER
           console.log('✅ Forzando actualización del listener de chats...');
-          setTimeout(async () => {
-              try {
-                  const snapshot = await get(dbRef(db, "chats"));
-                  console.log('📊 Snapshot obtenido:', snapshot.exists() ? 'CON DATOS' : 'SIN DATOS');
-              } catch (error) {
-                  console.error('❌ Error al verificar chats:', error);
+          // El listener onValue de chats se encarga de cargar los datos
+          // No hacemos get() manual para evitar errores de timing con la autenticación
+          setTimeout(() => {
+              if (!DOMElements.listaChats.querySelector('.chat-item')) {
+                  DOMElements.listaChats.innerHTML = "<p style='color:#888;text-align:center;padding:20px;'>Cargando chats...</p>";
               }
-          }, 500);
-          try {
-              const snapshot = await get(dbRef(db, "chats"));
-              const data = snapshot.val();
-              if (data) {
-                  console.log('📊 Datos de chats recibidos:', Object.keys(data).length, 'chats');
-                  lastProcessedChats = {};
-                  // El listener onValue se encargará de procesarlos
-              } else {
-                  console.log('⚠️ No hay chats en la base de datos');
-                  DOMElements.listaChats.innerHTML = "<p>No hay chats activos aún.</p>";
-              }
-          } catch (error) {
-              console.error('❌ Error al cargar chats iniciales:', error);
-          }
+          }, 1000);
       } else {
           console.log('❌ Usuario no autenticado');
           DOMElements.loginDiv.style.display = 'flex';
@@ -2125,7 +2120,7 @@
   // ==================== LISTENER DE CHATS ====================
 onValue(dbRef(db, "chats"), async snapshot => { 
   if (!auth.currentUser) {
-      DOMElements.listaChats.innerHTML = "<p>Inicia sesión para ver los chats.</p>";
+      // Silently ignore - user not logged in yet
       return;
   } 
   if (chatListenerActive) {
@@ -2662,6 +2657,11 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       const targetTab = btn.dataset.tab;
       btn.classList.add('active');
       document.getElementById(targetTab).classList.add('active');
+      if (targetTab === 'barriosSection') {
+          if (!document.getElementById('tabla-barrios-admin').querySelector('table')) {
+              renderTablaBarrios(BARRIOS_ADMIN);
+          }
+      }
       if (targetTab !== 'clientes') {
           window.volverAlista(); 
       } else {
@@ -2788,6 +2788,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
   });
   // ==================== LISTENERS DE PEDIDOS ====================
   onValue(dbRef(db, "pedidos_historial"), snapshot => {
+    if (!auth.currentUser) return;
       if (!auth.currentUser) return; 
       const data = snapshot.val();
       allPedidos = data || {}; 
@@ -2797,6 +2798,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       }
   });
   onValue(dbRef(db, "pedidos_pendientes"), snapshot => {
+    if (!auth.currentUser) return;
       if (!auth.currentUser) return;
       const pendingData = snapshot.val();
       if (pendingData) {
@@ -3978,7 +3980,21 @@ return alert("Error: El pedido original no se encontró.");
       <div class="det-row"><span>Teléfono:</span><span><a href="tel:${telefono}" style="color:#4A9EFF;">${telefono}</a></span></div>
       <div class="det-row"><span>Email:</span><span>${email}</span></div>
       <div class="det-row"><span>Dirección:</span><span>${direccion}</span></div>
-      <h4>🚴 Pedido</h4>
+      <h4 style="color:#FFC300;border-bottom:1px solid #444;padding-bottom:5px;">📦 Punto A – Recogida</h4>
+      <div class="det-row"><span>Nombre:</span><span>${pedido.nombreEntrega||'—'}</span></div>
+      <div class="det-row"><span>Dirección:</span><span>${pedido.dirRecogida||direccion}</span></div>
+      <div class="det-row"><span>Teléfono:</span><span>${pedido.telEntrega||'—'}</span></div>
+      <div class="det-row"><span>Barrio:</span><span style="color:#FFC300;font-weight:bold;">${pedido.barrioRecogida||'—'}</span></div>
+      <div class="det-row"><span>Comuna:</span><span>${pedido.comunaRecogida||'—'}</span></div>
+      <div class="det-row"><span>Zona:</span><span>${pedido.zonaRecogida||'—'}</span></div>
+      <h4 style="color:#28a745;border-bottom:1px solid #444;padding-bottom:5px;">🏠 Punto B – Entrega</h4>
+      <div class="det-row"><span>Nombre:</span><span>${pedido.nombreRecibe||nombre}</span></div>
+      <div class="det-row"><span>Dirección:</span><span>${pedido.dirEntrega||'—'}</span></div>
+      <div class="det-row"><span>Teléfono:</span><span>${pedido.telRecibe||telefono}</span></div>
+      <div class="det-row"><span>Barrio:</span><span style="color:#4A9EFF;font-weight:bold;">${pedido.barrioEntrega||'—'}</span></div>
+      <div class="det-row"><span>Comuna:</span><span>${pedido.comunaEntrega||'—'}</span></div>
+      <div class="det-row"><span>Zona:</span><span>${pedido.zonaEntrega||'—'}</span></div>
+      <h4 style="color:#aaa;border-bottom:1px solid #444;padding-bottom:5px;">🚴 Pedido</h4>
       <div class="det-row"><span>Descripción:</span><span>${descripcion}</span></div>
       <div class="det-row"><span>Monto:</span><span style="color:#FFD700;font-weight:bold;">$${(typeof monto==='number'?monto.toLocaleString('es-ES'):monto)}</span></div>
       <div class="det-row"><span>Repartidor:</span><span>${rep}</span></div>
@@ -4012,6 +4028,38 @@ return alert("Error: El pedido original no se encontró.");
   </div>
 </div>
 
+<!-- ==================== SECCIÓN: BARRIOS ==================== -->
+<section id="barriosSection">
+  <h2 style="margin-top:0;margin-bottom:15px;">🗺️ Barrios de Armenia — 312 barrios oficiales</h2>
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+    <input type="text" id="filtro-barrio-admin" placeholder="🔍 Buscar barrio..." oninput="filtrarBarriosAdmin()" style="flex:1;min-width:180px;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;"/>
+    <select id="filtro-zona-admin" onchange="filtrarBarriosAdmin()" style="background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;">
+      <option value="">Todas las zonas</option>
+      <option value="sur">🔴 Sur</option>
+      <option value="centro">🟡 Centro</option>
+      <option value="norte">🔵 Norte</option>
+      <option value="oriente">🟠 Oriente</option>
+      <option value="occidente">🟣 Occidente</option>
+    </select>
+    <select id="filtro-comuna-admin" onchange="filtrarBarriosAdmin()" style="background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;">
+      <option value="">Todas las comunas</option>
+      <option value="1">C1 - Centenario</option>
+      <option value="2">C2 - Rufino José Cuervo Sur</option>
+      <option value="3">C3 - Alfonso López</option>
+      <option value="4">C4 - Francisco de Paula Santander</option>
+      <option value="5">C5 - El Bosque</option>
+      <option value="6">C6 - San José</option>
+      <option value="7">C7 - Cafetero</option>
+      <option value="8">C8 - Libertadores</option>
+      <option value="9">C9 - Fundadores</option>
+      <option value="10">C10 - Quimbaya</option>
+    </select>
+    <button onclick="subirBarriosFirebase()" id="btn-subir-barrios" style="background:#FFC300;color:#000;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;">📤 Subir todos a Firebase</button>
+  </div>
+  <div id="stats-barrios" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
+  <div id="tabla-barrios-admin" style="background:#222;border-radius:10px;overflow:hidden;max-height:600px;overflow-y:auto;"></div>
+</section>
+
 <!-- ==================== SECCIÓN: SOPORTE CLIENTES ==================== -->
 <section id="soporteClientes">
   <h2 style="margin-top:0;margin-bottom:10px;">🆘 Soporte para Pedidos</h2>
@@ -4044,6 +4092,133 @@ return alert("Error: El pedido original no se encontró.");
     <div id="modalDetallePedidoContenido"></div>
   </div>
 </div>
+
+
+<script>
+// ============================================================
+// MÓDULO ADMIN: 312 BARRIOS — FILTROS — FIREBASE — ESTADÍSTICAS
+// ============================================================
+const BARRIOS_ADMIN = [
+  // COMUNA 1 - CENTENARIO (Sur)
+  {n:"Arenales",z:"sur",c:"1",cn:"Centenario"},{n:"Arrayanes",z:"sur",c:"1",cn:"Centenario"},{n:"Bambusa",z:"sur",c:"1",cn:"Centenario"},{n:"Bloques de Bosques de Pinares",z:"sur",c:"1",cn:"Centenario"},{n:"Bosques de Pinares",z:"sur",c:"1",cn:"Centenario"},{n:"Castilla Grande",z:"sur",c:"1",cn:"Centenario"},{n:"Ciudadela Simón Bolívar",z:"sur",c:"1",cn:"Centenario"},{n:"Conjunto Balcones del Edén",z:"sur",c:"1",cn:"Centenario"},{n:"Conjunto Residencial Guaduales del Edén",z:"sur",c:"1",cn:"Centenario"},{n:"Conjunto Residencial La Villa",z:"sur",c:"1",cn:"Centenario"},{n:"El Emperador",z:"sur",c:"1",cn:"Centenario"},{n:"El Milagro",z:"sur",c:"1",cn:"Centenario"},{n:"El Palmar",z:"sur",c:"1",cn:"Centenario"},{n:"Génesis",z:"sur",c:"1",cn:"Centenario"},{n:"La Arcadia",z:"sur",c:"1",cn:"Centenario"},{n:"La Castilla",z:"sur",c:"1",cn:"Centenario"},{n:"La Isabela",z:"sur",c:"1",cn:"Centenario"},{n:"La Villa",z:"sur",c:"1",cn:"Centenario"},{n:"Maravelez",z:"sur",c:"1",cn:"Centenario"},{n:"Nuestra Señora de la Paz",z:"sur",c:"1",cn:"Centenario"},{n:"Parque de la Villa",z:"sur",c:"1",cn:"Centenario"},{n:"Pinares",z:"sur",c:"1",cn:"Centenario"},{n:"Portal de Pinares",z:"sur",c:"1",cn:"Centenario"},{n:"Portal del Edén",z:"sur",c:"1",cn:"Centenario"},{n:"Santa María del Bosque",z:"sur",c:"1",cn:"Centenario"},{n:"Tres Esquinas",z:"sur",c:"1",cn:"Centenario"},{n:"Urbanización Cañas Gordas",z:"sur",c:"1",cn:"Centenario"},{n:"Urbanización Guaduales de la Villa",z:"sur",c:"1",cn:"Centenario"},{n:"Urbanización La Linda",z:"sur",c:"1",cn:"Centenario"},{n:"Villa Centenario",z:"sur",c:"1",cn:"Centenario"},{n:"Vista Hermosa",z:"sur",c:"1",cn:"Centenario"},
+  // COMUNA 2 - RUFINO JOSÉ CUERVO SUR (Sur)
+  {n:"14 de Octubre",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"19 de Enero",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"8 de Marzo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Alcázar del Café",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Antonio Nariño",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Barrio Calima",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Barrio La Milagrosa",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Barrio Zuldemayda",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Barrio San Vicente de Paul",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Bello Horizonte",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Bloques El Porvenir",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Bosques de Gibraltar",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Ciudadela Puerto Espejo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Cristales",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"El Carmelo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"El Poblado",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"El Tesorito",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Farallones",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Gibraltar",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Jesús María Ocampo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"La Fachada",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"La Virginia",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Las Acacias",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Las Brisas",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Las Veraneras",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Los Naranjos",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Los Quindos",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Los Quindos II Etapa",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Los Quindos III Etapa",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Luis Carlos Galán",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Manantiales",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Marco Fidel Suárez",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Nuevo Horizonte",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Patricia",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"San Francisco",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Santa Rita",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Serranías",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Urbanización Girasoles",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Urbanización Jardines de la Fachada",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Urbanización Lindaraja",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Urbanización Lindaraja II Etapa",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Veracruz",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Villa Alejandra",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Villa Claudia",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Villa de la Vida y el Trabajo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Villa del Carmen",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},
+  // COMUNA 3 - ALFONSO LÓPEZ (Sur)
+  {n:"Alfonso López",z:"sur",c:"3",cn:"Alfonso López"},{n:"Arcades",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio 13 de Junio",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio 25 de Mayo",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Arcoíris",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Belén",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Ciudadela",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Cooperativo",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio El Placer",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Adiela",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Alhambra",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Esmeralda",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Miranda",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Los Kioscos",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Manuela Beltrán",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Mesón de Sinaí",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Santa María",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Villa Hermosa",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Villa Laura",z:"sur",c:"3",cn:"Alfonso López"},{n:"Bosques de Viena",z:"sur",c:"3",cn:"Alfonso López"},{n:"Casablanca",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudad Dorada",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudadela Nuevo Armenia III",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudadela Nuevo Armenia",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudadela Nuevo Armenia II",z:"sur",c:"3",cn:"Alfonso López"},{n:"Conjunto Residencial Montecarlo",z:"sur",c:"3",cn:"Alfonso López"},{n:"Conjunto Residencial Sinaí",z:"sur",c:"3",cn:"Alfonso López"},{n:"Cordillera",z:"sur",c:"3",cn:"Alfonso López"},{n:"La Cecilia",z:"sur",c:"3",cn:"Alfonso López"},{n:"La Cristalina",z:"sur",c:"3",cn:"Alfonso López"},{n:"Nuevo Placer",z:"sur",c:"3",cn:"Alfonso López"},{n:"Quintas de la Marina",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización La Grecia",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Las Colinas",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Loma Verde",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Nuevo Amanecer",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización San Diego",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Villa Ángela",z:"sur",c:"3",cn:"Alfonso López"},{n:"Villa Italia",z:"sur",c:"3",cn:"Alfonso López"},
+  // COMUNA 4 - FRANCISCO DE PAULA SANTANDER (Oriente)
+  {n:"Barrio Brasilia",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Beléncito",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Brasilia Nueva",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Cincuentenario",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio El Prado",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Gaitán",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Miraflores",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Miraflores Bajo",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Obrero",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Popular",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Santa Fe",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Santa Helena",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Santander",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"El Refugio",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"San José Sur",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Sector Boyacá",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Villa del Café",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Villa Juliana",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},
+  // COMUNA 5 - EL BOSQUE (Oriente)
+  {n:"1 de Mayo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Artesanos",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio 7 de Agosto",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Berlín",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio El Recreo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Kennedy",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio La Unión",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Monteprado",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Montevideo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Nueva Libertad",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Salazar",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Villa Liliana",z:"oriente",c:"5",cn:"El Bosque"},{n:"Casas Fiscales",z:"oriente",c:"5",cn:"El Bosque"},{n:"La Anunciación",z:"oriente",c:"5",cn:"El Bosque"},{n:"Montevideo Bajo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Nuevo Recreo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Palmares del Recreo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Urbanización El Silencio I",z:"oriente",c:"5",cn:"El Bosque"},{n:"Urbanización El Silencio II",z:"oriente",c:"5",cn:"El Bosque"},
+  // COMUNA 6 - SAN JOSÉ (Occidente)
+  {n:"Barrio La Clarita",z:"occidente",c:"6",cn:"San José"},{n:"Barrio La Patria",z:"occidente",c:"6",cn:"San José"},{n:"Barrio Las Américas",z:"occidente",c:"6",cn:"San José"},{n:"Barrio Los Cámbulos",z:"occidente",c:"6",cn:"San José"},{n:"Barrio Quindío",z:"occidente",c:"6",cn:"San José"},{n:"Barrio Universal",z:"occidente",c:"6",cn:"San José"},{n:"Barrio San José",z:"occidente",c:"6",cn:"San José"},{n:"Carolina I",z:"occidente",c:"6",cn:"San José"},{n:"Condominio San José de la Sierra",z:"occidente",c:"6",cn:"San José"},{n:"Conjunto Residencial Aldea de los Comuneros",z:"occidente",c:"6",cn:"San José"},{n:"Conjunto Residencial Villa Jardín",z:"occidente",c:"6",cn:"San José"},{n:"El Parque I",z:"occidente",c:"6",cn:"San José"},{n:"El Parque II",z:"occidente",c:"6",cn:"San José"},{n:"Gustavo Rojas Pinilla I",z:"occidente",c:"6",cn:"San José"},{n:"Gustavo Rojas Pinilla II",z:"occidente",c:"6",cn:"San José"},{n:"La Montaña",z:"occidente",c:"6",cn:"San José"},{n:"Los Almendros",z:"occidente",c:"6",cn:"San José"},{n:"Los Andes I",z:"occidente",c:"6",cn:"San José"},{n:"Quintas de Juliana",z:"occidente",c:"6",cn:"San José"},{n:"Rincón de los Andes",z:"occidente",c:"6",cn:"San José"},{n:"Santa Sofía",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Altos de la Pavona",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización El Cortijo",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización La Irlanda",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización La Pavona",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Monteblanco I Etapa",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Monteblanco II Etapa",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Monteblanco III Etapa",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Quintas de los Andes",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización San Andrés",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Villa Andrea",z:"occidente",c:"6",cn:"San José"},{n:"Vaguita de Tigreros",z:"occidente",c:"6",cn:"San José"},{n:"Villa Carolina II",z:"occidente",c:"6",cn:"San José"},{n:"Villa Celmira",z:"occidente",c:"6",cn:"San José"},{n:"Villa de las Américas",z:"occidente",c:"6",cn:"San José"},{n:"Villa Ximena",z:"occidente",c:"6",cn:"San José"},
+  // COMUNA 7 - CAFETERO (Centro)
+  {n:"Barrio Alberto Zuleta",z:"centro",c:"7",cn:"Cafetero"},{n:"Barrio Patio Bonito Alto",z:"centro",c:"7",cn:"Cafetero"},{n:"Barrio Rincón Santo",z:"centro",c:"7",cn:"Cafetero"},{n:"Barrio San Fernando",z:"centro",c:"7",cn:"Cafetero"},{n:"Barrio San Nicolás",z:"centro",c:"7",cn:"Cafetero"},{n:"Barrio Uribe",z:"centro",c:"7",cn:"Cafetero"},{n:"Barrio Vélez",z:"centro",c:"7",cn:"Cafetero"},{n:"Condominio La Aldea",z:"centro",c:"7",cn:"Cafetero"},{n:"Condominio Torres del Río",z:"centro",c:"7",cn:"Cafetero"},{n:"Conjunto Residencial Sotavento",z:"centro",c:"7",cn:"Cafetero"},{n:"Guayaquil Alto",z:"centro",c:"7",cn:"Cafetero"},{n:"La Florida",z:"centro",c:"7",cn:"Cafetero"},{n:"Sector Centro",z:"centro",c:"7",cn:"Cafetero"},{n:"Sector Parque Valencia",z:"centro",c:"7",cn:"Cafetero"},{n:"Urbanización María Cristina I Etapa",z:"centro",c:"7",cn:"Cafetero"},{n:"Urbanización María Cristina II Etapa",z:"centro",c:"7",cn:"Cafetero"},{n:"Urbanización María Cristina III Etapa",z:"centro",c:"7",cn:"Cafetero"},
+  // COMUNA 8 - LIBERTADORES (Occidente)
+  {n:"Barrio Ahitamara",z:"occidente",c:"8",cn:"Libertadores"},{n:"Barrio Corbones",z:"occidente",c:"8",cn:"Libertadores"},{n:"Barrio La Divisa",z:"occidente",c:"8",cn:"Libertadores"},{n:"Barrio La Esperanza",z:"occidente",c:"8",cn:"Libertadores"},{n:"Barrio Las Mercedes",z:"occidente",c:"8",cn:"Libertadores"},{n:"Barrio Tigreros",z:"occidente",c:"8",cn:"Libertadores"},{n:"El Berlín",z:"occidente",c:"8",cn:"Libertadores"},{n:"El Limonar I Etapa",z:"occidente",c:"8",cn:"Libertadores"},{n:"El Limonar II Etapa",z:"occidente",c:"8",cn:"Libertadores"},{n:"El Limonar III Etapa",z:"occidente",c:"8",cn:"Libertadores"},{n:"El Limonar IV Etapa",z:"occidente",c:"8",cn:"Libertadores"},{n:"El Paraíso",z:"occidente",c:"8",cn:"Libertadores"},{n:"Francisco José de Caldas",z:"occidente",c:"8",cn:"Libertadores"},{n:"Jubileo",z:"occidente",c:"8",cn:"Libertadores"},{n:"Las Colinas",z:"occidente",c:"8",cn:"Libertadores"},{n:"Libertadores",z:"occidente",c:"8",cn:"Libertadores"},{n:"Nuevo Berlín",z:"occidente",c:"8",cn:"Libertadores"},{n:"Piamonte",z:"occidente",c:"8",cn:"Libertadores"},{n:"Urbanización Altos de la Calleja",z:"occidente",c:"8",cn:"Libertadores"},{n:"Urbanización Centenario",z:"occidente",c:"8",cn:"Libertadores"},{n:"Urbanización Villa Inglesa",z:"occidente",c:"8",cn:"Libertadores"},{n:"Villa Sofía",z:"occidente",c:"8",cn:"Libertadores"},
+  // COMUNA 9 - FUNDADORES (Norte)
+  {n:"Altos del Niágara",z:"norte",c:"9",cn:"Fundadores"},{n:"Bajo Niágara",z:"norte",c:"9",cn:"Fundadores"},{n:"Barrio Las 60 Casas",z:"norte",c:"9",cn:"Fundadores"},{n:"Barrio Los Álamos",z:"norte",c:"9",cn:"Fundadores"},{n:"Barrio Modelo",z:"norte",c:"9",cn:"Fundadores"},{n:"Barrio Vieja Libertad",z:"norte",c:"9",cn:"Fundadores"},{n:"Ciudadela Sorrento",z:"norte",c:"9",cn:"Fundadores"},{n:"Conjunto El Remanso",z:"norte",c:"9",cn:"Fundadores"},{n:"Conjunto Residencial Nisa Bulevar",z:"norte",c:"9",cn:"Fundadores"},{n:"Conjunto Residencial Palmas del Modelo",z:"norte",c:"9",cn:"Fundadores"},{n:"Conjunto Residencial Guayacanes",z:"norte",c:"9",cn:"Fundadores"},{n:"Edificio Alto de las Palmas",z:"norte",c:"9",cn:"Fundadores"},{n:"Edificio Torres del Granada",z:"norte",c:"9",cn:"Fundadores"},{n:"Gran Bretaña",z:"norte",c:"9",cn:"Fundadores"},{n:"Granada",z:"norte",c:"9",cn:"Fundadores"},{n:"La Arboleda",z:"norte",c:"9",cn:"Fundadores"},{n:"La Cabaña",z:"norte",c:"9",cn:"Fundadores"},{n:"Las Palmas",z:"norte",c:"9",cn:"Fundadores"},{n:"Quintas del Yulima",z:"norte",c:"9",cn:"Fundadores"},{n:"Rincón de Yulima",z:"norte",c:"9",cn:"Fundadores"},{n:"Yulima I",z:"norte",c:"9",cn:"Fundadores"},{n:"Yulima II",z:"norte",c:"9",cn:"Fundadores"},{n:"Yulima III",z:"norte",c:"9",cn:"Fundadores"},
+  // COMUNA 10 - QUIMBAYA (Norte)
+  {n:"Asentamiento Los Fundadores",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Alcázar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio El Nogal",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Fundadores",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Galán",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Campiña",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Lorena",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Nueva Cecilia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Suiza",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Laureles",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Los Profesionales",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Mercedes del Norte",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Nueva Cecilia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Providencia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Salvador Allende",z:"norte",c:"10",cn:"Quimbaya"},{n:"Bloques Palmas de Sorrento",z:"norte",c:"10",cn:"Quimbaya"},{n:"Ciudadela Quimbaya",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio Altos del Bosque",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio Caminos de Calay",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio El Alcázar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio El Molino",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio El Palmar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio La Hacienda",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Cerrado Caminos de San Lorenzo",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Multifamiliar Providencia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Alejandría",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Bosques de Palermo",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Bosques de San Martín",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Bulevar del Coliseo",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Casa Loma",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Coinca",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial El Retiro",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Jardín de las Mercedes",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Abadía",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Alquería",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Estancia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Hacienda Palmacera",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Las Lomas",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Los Andes",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Pasadena Country",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Plazoleta Andina",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Portal de la Colonia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Rincón de Andalucía",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Torres de Marfil",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Torres del Alcázar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Santillana del Mar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Rincón de la Samaria",z:"norte",c:"10",cn:"Quimbaya"},{n:"Parque Residencial Las Veraneras",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad I",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad II",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad III",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad IV",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad V",z:"norte",c:"10",cn:"Quimbaya"},{n:"Sector Bavaria",z:"norte",c:"10",cn:"Quimbaya"},{n:"Simón Bolívar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Torres Providencia I",z:"norte",c:"10",cn:"Quimbaya"},{n:"Torres Providencia II",z:"norte",c:"10",cn:"Quimbaya"},{n:"Urbanización Bosques de Viena",z:"norte",c:"10",cn:"Quimbaya"},{n:"Urbanización La Aurora",z:"norte",c:"10",cn:"Quimbaya"},{n:"Urbanización La Mariela",z:"norte",c:"10",cn:"Quimbaya"},{n:"Urbanización Los Tulipanes",z:"norte",c:"10",cn:"Quimbaya"}
+];
+
+const ZONA_EMOJI = {sur:"🔴",centro:"🟡",norte:"🔵",oriente:"🟠",occidente:"🟣"};
+const ZONA_COLOR = {sur:"#e74c3c",centro:"#f1c40f",norte:"#3498db",oriente:"#e67e22",occidente:"#9b59b6"};
+
+// ── RENDERIZAR TABLA DE BARRIOS ─────────────────────────────
+function renderTablaBarrios(lista) {
+  const tabla = document.getElementById('tabla-barrios-admin');
+  const stats = document.getElementById('stats-barrios');
+  if (!tabla) return;
+
+  // Stats por zona
+  const porZona = {};
+  lista.forEach(b => { porZona[b.z] = (porZona[b.z]||0)+1; });
+  stats.innerHTML = Object.entries(porZona).map(([z,n]) =>
+    `<span style="background:${ZONA_COLOR[z]||'#555'};color:#fff;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:bold;">${ZONA_EMOJI[z]||'📍'} ${z.charAt(0).toUpperCase()+z.slice(1)}: ${n}</span>`
+  ).join('') + `<span style="background:#444;color:#fff;padding:5px 12px;border-radius:20px;font-size:12px;">Total: ${lista.length}</span>`;
+
+  if (!lista.length) {
+    tabla.innerHTML = '<p style="color:#888;text-align:center;padding:30px;">No se encontraron barrios con ese filtro.</p>';
+    return;
+  }
+
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead>
+      <tr style="background:#333;position:sticky;top:0;">
+        <th style="padding:10px;text-align:left;color:#FFC300;">#</th>
+        <th style="padding:10px;text-align:left;color:#FFC300;">Barrio</th>
+        <th style="padding:10px;text-align:left;color:#FFC300;">Comuna</th>
+        <th style="padding:10px;text-align:left;color:#FFC300;">Zona</th>
+        <th style="padding:10px;text-align:left;color:#FFC300;">ID Firebase</th>
+      </tr>
+    </thead><tbody>`;
+
+  lista.forEach((b, i) => {
+    const id = 'c'+b.c+'_'+b.n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'_').slice(0,20);
+    html += `<tr style="border-bottom:1px solid #333;${i%2===0?'background:#2a2a2a':'background:#222'}">
+      <td style="padding:8px;color:#666;">${i+1}</td>
+      <td style="padding:8px;color:#fff;">${b.n}</td>
+      <td style="padding:8px;color:#aaa;">C${b.c} - ${b.cn}</td>
+      <td style="padding:8px;"><span style="background:${ZONA_COLOR[b.z]||'#555'};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">${ZONA_EMOJI[b.z]} ${b.z}</span></td>
+      <td style="padding:8px;color:#666;font-size:11px;font-family:monospace;">${id}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  tabla.innerHTML = html;
+}
+
+// ── FILTRAR BARRIOS ─────────────────────────────────────────
+window.filtrarBarriosAdmin = function() {
+  const q    = (document.getElementById('filtro-barrio-admin')?.value||'').toLowerCase().trim();
+  const zona = document.getElementById('filtro-zona-admin')?.value||'';
+  const com  = document.getElementById('filtro-comuna-admin')?.value||'';
+  const res  = BARRIOS_ADMIN.filter(b =>
+    (!q    || b.n.toLowerCase().includes(q) || b.cn.toLowerCase().includes(q)) &&
+    (!zona || b.z === zona) &&
+    (!com  || b.c === com)
+  );
+  renderTablaBarrios(res);
+};
+
+// ── SUBIR BARRIOS A FIREBASE ────────────────────────────────
+window.subirBarriosFirebase = async function() {
+  const btn = document.getElementById('btn-subir-barrios');
+  const conf = confirm('¿Subir los 312 barrios a Firebase en /barrios/?\nEsto crea/sobreescribe el nodo /barrios con todos los barrios.');
+  if (!conf) return;
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Subiendo...';
+
+  try {
+    const _db    = window.db    || db;
+    const _ref   = window.dbRef || dbRef;
+    const _set   = window.dbSet || set;
+    const batch = {};
+    BARRIOS_ADMIN.forEach((b, i) => {
+      const id = 'c'+b.c+'_'+b.n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'_').slice(0,20)+'_'+i;
+      batch[id] = {
+        nombre:       b.n,
+        zona:         b.z,
+        comuna:       b.c,
+        nombreComuna: b.cn,
+        activo:       true
+      };
+    });
+    await _set(_ref(_db, 'barrios'), batch);
+    btn.textContent = '✅ ¡Subidos!';
+    btn.style.background = '#27ae60';
+    btn.style.color = '#fff';
+    setTimeout(()=>{ btn.textContent='📤 Subir todos a Firebase'; btn.style.background='#FFC300'; btn.style.color='#000'; btn.disabled=false; }, 3000);
+    alert('✅ 312 barrios subidos correctamente a Firebase en /barrios/');
+  } catch(e) {
+    alert('❌ Error: ' + e.message);
+    btn.textContent = '📤 Subir todos a Firebase';
+    btn.disabled = false;
+  }
+};
+
+
+</script>
 
 </body>
 </html>
