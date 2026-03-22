@@ -1267,7 +1267,7 @@
     <button class="tab-btn" data-tab="mapaRepartidores">🗺️ Mapa</button>
     <button class="tab-btn" data-tab="tiendas">🏪 Tiendas</button>
     <button class="tab-btn" data-tab="soporteClientes" id="tabSoporte">🆘 Soporte <span id="soporte-badge" style="display:none;background:#ff4444;color:#fff;border-radius:50%;padding:2px 7px;font-size:11px;margin-left:4px;font-weight:bold;">0</span></button>
-    <button class="tab-btn" data-tab="barriosSection">🗺️ Barrios</button>
+    <button class="tab-btn" data-tab="barriosSection">🗺️ Barrios <span id="badge-sugerencias" style="display:none;background:#e67e22;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px;font-weight:bold;"></span></button>
   </div>
 </header>
 <!-- ==================== SECCIÓN: CHATS ==================== -->
@@ -2661,6 +2661,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           if (!document.getElementById('tabla-barrios-admin').querySelector('table')) {
               renderTablaBarrios(BARRIOS_ADMIN);
           }
+          escucharSugerencias();
       }
       if (targetTab !== 'clientes') {
           window.volverAlista(); 
@@ -4006,6 +4007,96 @@ return alert("Error: El pedido original no se encontró.");
     modal.style.display = 'block';
   }
 
+
+// ── SUGERENCIAS DE BARRIOS ─────────────────────────────────
+let _sugerenciasListener = null;
+
+function escucharSugerencias() {
+  if (_sugerenciasListener) return;
+  _sugerenciasListener = onValue(dbRef(db, 'barrios_sugeridos'), snap => {
+    const cont = document.getElementById('sugerencias-container');
+    const lista = document.getElementById('lista-sugerencias');
+    const badge = document.getElementById('badge-sugerencias');
+    if (!cont || !lista) return;
+
+    const data = snap.val();
+    const pendientes = data ? Object.entries(data).filter(([,v]) => v.estado === 'pendiente') : [];
+
+    if (!pendientes.length) {
+      cont.style.display = 'none';
+      badge.style.display = 'none';
+      return;
+    }
+
+    badge.textContent = pendientes.length;
+    badge.style.display = 'inline';
+    cont.style.display = 'block';
+
+    lista.innerHTML = '';
+    pendientes.forEach(([id, sug]) => {
+      const div = document.createElement('div');
+      div.style.cssText = 'background:#2a1a00;border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid #e67e22;';
+      const mapsLink = sug.lat && sug.lng
+        ? `<a href="https://www.google.com/maps?q=${sug.lat},${sug.lng}" target="_blank" style="color:#4A9EFF;font-size:12px;">📍 Ver en mapa</a>`
+        : '<span style="color:#666;font-size:12px;">Sin coordenadas GPS</span>';
+      div.innerHTML = `
+        <div style="font-weight:bold;color:#fff;margin-bottom:4px;">📌 ${sug.nombre}</div>
+        <div style="font-size:12px;color:#aaa;margin-bottom:6px;">
+          Tipo: <span style="color:#e67e22;">${sug.tipo === 'fuera' ? 'Fuera de Armenia' : sug.tipo}</span> ·
+          Cliente: ${sug.clienteNombre || 'Desconocido'} · ${mapsLink}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="aprobarSugerencia('${id}')" style="flex:1;background:#27ae60;color:#fff;border:none;padding:8px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:13px;">✅ Aprobar</button>
+          <button onclick="rechazarSugerencia('${id}')" style="background:#c0392b;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:13px;">✕ Rechazar</button>
+        </div>`;
+      lista.appendChild(div);
+    });
+  });
+}
+
+window.aprobarSugerencia = async function(id) {
+  try {
+    const snap = await get(dbRef(db, 'barrios_sugeridos/' + id));
+    if (!snap.exists()) return;
+    const sug = snap.val();
+    const comunaNames = {'fuera':'Fuera de Armenia','sur':'Sur','norte':'Norte','centro':'Centro','oriente':'Oriente','occidente':'Occidente'};
+    const zona = sug.tipo === 'fuera' ? 'fuera' : (sug.tipo || 'centro');
+    const barId = 'ext_' + sug.nombre.toLowerCase().normalize('NFD')
+      .replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'_').slice(0,25) + '_' + Date.now().toString().slice(-4);
+
+    await set(dbRef(db, 'barrios/' + barId), {
+      nombre:       sug.nombre,
+      zona,
+      comuna:       sug.tipo === 'fuera' ? 'ext' : sug.tipo,
+      nombreComuna: sug.tipo === 'fuera' ? 'Fuera de Armenia' : comunaNames[sug.tipo] || '',
+      lat:          sug.lat || null,
+      lng:          sug.lng || null,
+      activo:       true,
+      aprobadoPor:  'admin',
+      fecha:        Date.now()
+    });
+    await update(dbRef(db, 'barrios_sugeridos/' + id), { estado: 'aprobado' });
+    BARRIOS_ADMIN.push({ n: sug.nombre, z: zona, c: 'ext', cn: 'Fuera de Armenia' });
+    filtrarBarriosAdmin();
+    alert('✅ Barrio "' + sug.nombre + '" aprobado y agregado a Firebase.');
+  } catch(e) { alert('❌ Error: ' + e.message); }
+};
+
+window.rechazarSugerencia = async function(id) {
+  if (!confirm('¿Rechazar esta sugerencia?')) return;
+  await update(dbRef(db, 'barrios_sugeridos/' + id), { estado: 'rechazado' });
+};
+
+// Escuchar sugerencias desde el inicio para mostrar badge
+onValue(dbRef(db, 'barrios_sugeridos'), snap => {
+  const badge = document.getElementById('badge-sugerencias');
+  if (!badge) return;
+  const data = snap.val();
+  const pendientes = data ? Object.values(data).filter(v => v.estado === 'pendiente').length : 0;
+  badge.textContent = pendientes;
+  badge.style.display = pendientes > 0 ? 'inline' : 'none';
+});
+
   window.cerrarDetallePedido = function() {
     document.getElementById('modalDetallePedido').style.display = 'none';
   }
@@ -4054,7 +4145,52 @@ return alert("Error: El pedido original no se encontró.");
       <option value="9">C9 - Fundadores</option>
       <option value="10">C10 - Quimbaya</option>
     </select>
-    <button onclick="subirBarriosFirebase()" id="btn-subir-barrios" style="background:#FFC300;color:#000;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;">📤 Subir todos a Firebase</button>
+    <button onclick="abrirModalAgregarBarrio()" style="background:#FFC300;color:#000;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;">➕ Agregar Barrio</button>
+    <button onclick="subirBarriosFirebase()" id="btn-subir-barrios" style="background:#2a2a2a;color:#aaa;border:1px solid #444;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:13px;" title="Carga inicial de los 312 barrios base">📤 Carga inicial (312)</button>
+  </div>
+
+  <!-- MODAL AGREGAR BARRIO -->
+  <div id="modal-agregar-barrio" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;overflow-y:auto;">
+    <div style="background:#2a2a2a;margin:8% auto;padding:24px;border-radius:14px;max-width:420px;width:92%;border:1px solid #FFC300;">
+      <h3 style="color:#FFC300;margin:0 0 16px;">➕ Agregar Barrio / Conjunto</h3>
+      <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Nombre del barrio, conjunto o urbanización</label>
+      <input type="text" id="nuevo-barrio-nombre" placeholder="Ej: Conjunto Residencial El Lago" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;"/>
+      <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Zona</label>
+      <select id="nuevo-barrio-zona" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;">
+        <option value="">-- Selecciona zona --</option>
+        <option value="sur">🔴 Sur</option>
+        <option value="centro">🟡 Centro</option>
+        <option value="norte">🔵 Norte</option>
+        <option value="oriente">🟠 Oriente</option>
+        <option value="occidente">🟣 Occidente</option>
+      </select>
+      <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Comuna</label>
+      <select id="nuevo-barrio-comuna" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:20px;">
+        <option value="">-- Selecciona comuna --</option>
+        <option value="1">C1 - Centenario</option>
+        <option value="2">C2 - Rufino José Cuervo Sur</option>
+        <option value="3">C3 - Alfonso López</option>
+        <option value="4">C4 - Francisco de Paula Santander</option>
+        <option value="5">C5 - El Bosque</option>
+        <option value="6">C6 - San José</option>
+        <option value="7">C7 - Cafetero</option>
+        <option value="8">C8 - Libertadores</option>
+        <option value="9">C9 - Fundadores</option>
+        <option value="10">C10 - Quimbaya</option>
+        <option value="otro">Otro / Fuera de Armenia</option>
+      </select>
+      <div style="display:flex;gap:10px;">
+        <button onclick="guardarNuevoBarrio()" style="flex:1;background:#27ae60;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:15px;">💾 Guardar</button>
+        <button onclick="cerrarModalAgregarBarrio()" style="background:#555;color:#fff;border:none;padding:12px 16px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
+      </div>
+      <p id="msg-agregar-barrio" style="text-align:center;margin-top:12px;font-size:13px;display:none;"></p>
+    </div>
+  </div>
+
+  <!-- SUGERENCIAS PENDIENTES -->
+  <div id="sugerencias-container" style="display:none;background:#1a1200;border:1px solid #e67e22;border-radius:10px;padding:14px;margin-bottom:14px;">
+    <h4 style="color:#e67e22;margin:0 0 10px;">📬 Lugares sugeridos por clientes</h4>
+    <div id="lista-sugerencias"></div>
   </div>
   <div id="stats-barrios" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
   <div id="tabla-barrios-admin" style="background:#222;border-radius:10px;overflow:hidden;max-height:600px;overflow-y:auto;"></div>
@@ -4181,6 +4317,81 @@ window.filtrarBarriosAdmin = function() {
 };
 
 // ── SUBIR BARRIOS A FIREBASE ────────────────────────────────
+// ── MODAL AGREGAR BARRIO ───────────────────────────────────
+window.abrirModalAgregarBarrio = function() {
+  document.getElementById('modal-agregar-barrio').style.display = 'block';
+  document.getElementById('nuevo-barrio-nombre').focus();
+  document.getElementById('msg-agregar-barrio').style.display = 'none';
+};
+
+window.cerrarModalAgregarBarrio = function() {
+  document.getElementById('modal-agregar-barrio').style.display = 'none';
+  document.getElementById('nuevo-barrio-nombre').value = '';
+  document.getElementById('nuevo-barrio-zona').value = '';
+  document.getElementById('nuevo-barrio-comuna').value = '';
+};
+
+window.guardarNuevoBarrio = async function() {
+  const nombre = document.getElementById('nuevo-barrio-nombre').value.trim();
+  const zona   = document.getElementById('nuevo-barrio-zona').value;
+  const comuna = document.getElementById('nuevo-barrio-comuna').value;
+  const msg    = document.getElementById('msg-agregar-barrio');
+
+  if (!nombre || !zona || !comuna) {
+    msg.textContent = '⚠️ Completa todos los campos.';
+    msg.style.color = '#e74c3c';
+    msg.style.display = 'block';
+    return;
+  }
+
+  const comunaNames = {
+    '1':'Centenario','2':'Rufino José Cuervo Sur','3':'Alfonso López',
+    '4':'Francisco de Paula Santander','5':'El Bosque','6':'San José',
+    '7':'Cafetero','8':'Libertadores','9':'Fundadores','10':'Quimbaya',
+    'otro':'Otro'
+  };
+
+  const id = 'c'+comuna+'_'+nombre.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]/g,'_').slice(0,25) + '_' + Date.now().toString().slice(-4);
+
+  try {
+    msg.textContent = '⏳ Guardando...';
+    msg.style.color = '#FFC300';
+    msg.style.display = 'block';
+
+    await set(dbRef(db, 'barrios/' + id), {
+      nombre:       nombre,
+      zona:         zona,
+      comuna:       comuna,
+      nombreComuna: comunaNames[comuna] || 'Otro',
+      activo:       true,
+      agregadoPor:  'admin',
+      fecha:        Date.now()
+    });
+
+    // Agregar al array local para que aparezca en la tabla
+    BARRIOS_ADMIN.push({ n: nombre, z: zona, c: comuna, cn: comunaNames[comuna] || 'Otro' });
+    filtrarBarriosAdmin();
+
+    msg.textContent = '✅ Barrio guardado correctamente.';
+    msg.style.color = '#27ae60';
+
+    setTimeout(() => {
+      cerrarModalAgregarBarrio();
+    }, 1500);
+
+  } catch(e) {
+    msg.textContent = '❌ Error: ' + e.message;
+    msg.style.color = '#e74c3c';
+  }
+};
+
+// Cerrar modal al tocar fuera
+document.getElementById('modal-agregar-barrio')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-agregar-barrio')) cerrarModalAgregarBarrio();
+});
+
 window.subirBarriosFirebase = async function() {
   const btn = document.getElementById('btn-subir-barrios');
   const conf = confirm('¿Subir los 312 barrios a Firebase en /barrios/?\nEsto crea/sobreescribe el nodo /barrios con todos los barrios.');
