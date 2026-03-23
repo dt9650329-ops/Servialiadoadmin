@@ -4641,9 +4641,9 @@ window.subirBarriosFirebase = async function() {
   btn.textContent = '⏳ Subiendo...';
 
   try {
-    const _db    = window.db    || db;
-    const _ref   = window.dbRef || dbRef;
-    const _set   = window.dbSet || set;
+    const _db  = db;
+    const _ref = dbRef;
+    const _set = set;
     const batch = {};
     BARRIOS_ADMIN.forEach((b, i) => {
       const id = 'c'+b.c+'_'+b.n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'_').slice(0,20)+'_'+i;
