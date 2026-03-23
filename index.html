@@ -4083,7 +4083,7 @@ window.aprobarSugerencia = async function(id) {
     const barId = 'ext_' + sug.nombre.toLowerCase().normalize('NFD')
       .replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'_').slice(0,25) + '_' + Date.now().toString().slice(-4);
 
-    await set(dbRef(db, 'barrios/' + barId), {
+    await window.dbSet(window.dbRef(window.db, 'barrios/' + barId), {
       nombre:       sug.nombre,
       zona,
       comuna:       sug.tipo === 'fuera' ? 'ext' : sug.tipo,
@@ -4094,7 +4094,7 @@ window.aprobarSugerencia = async function(id) {
       aprobadoPor:  'admin',
       fecha:        Date.now()
     });
-    await update(dbRef(db, 'barrios_sugeridos/' + id), { estado: 'aprobado' });
+    await window.dbUpdate(window.dbRef(window.db, 'barrios_sugeridos/' + id), { estado: 'aprobado' });
     BARRIOS_ADMIN.push({ n: sug.nombre, z: zona, c: 'ext', cn: 'Fuera de Armenia' });
     filtrarBarriosAdmin();
     alert('✅ Barrio "' + sug.nombre + '" aprobado y agregado a Firebase.');
@@ -4595,12 +4595,18 @@ window.guardarNuevoBarrio = async function() {
     .normalize('NFD').replace(/[̀-ͯ]/g,'')
     .replace(/[^a-z0-9]/g,'_').slice(0,25) + '_' + Date.now().toString().slice(-4);
 
+  if (!window.db || !window.dbRef || !window.dbSet) {
+    msg.textContent = '❌ Firebase no está listo. Espera y reintenta.';
+    msg.style.color = '#e74c3c';
+    msg.style.display = 'block';
+    return;
+  }
   try {
     msg.textContent = '⏳ Guardando...';
     msg.style.color = '#FFC300';
     msg.style.display = 'block';
 
-    await set(dbRef(db, 'barrios/' + id), {
+    await window.dbSet(window.dbRef(window.db, 'barrios/' + id), {
       nombre:       nombre,
       zona:         zona,
       comuna:       comuna,
@@ -4640,10 +4646,15 @@ window.subirBarriosFirebase = async function() {
   btn.disabled = true;
   btn.textContent = '⏳ Subiendo...';
 
+  if (!window.db || !window.dbRef || !window.dbSet) {
+    alert('❌ Firebase no está listo. Espera unos segundos y vuelve a intentar.');
+    btn.disabled = false;
+    return;
+  }
   try {
-    const _db  = db;
-    const _ref = dbRef;
-    const _set = set;
+    const _db  = window.db;
+    const _ref = window.dbRef;
+    const _set = window.dbSet;
     const batch = {};
     BARRIOS_ADMIN.forEach((b, i) => {
       const id = 'c'+b.c+'_'+b.n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'_').slice(0,20)+'_'+i;
@@ -4659,11 +4670,11 @@ window.subirBarriosFirebase = async function() {
     btn.textContent = '✅ ¡Subidos!';
     btn.style.background = '#27ae60';
     btn.style.color = '#fff';
-    setTimeout(()=>{ btn.textContent='📤 Subir todos a Firebase'; btn.style.background='#FFC300'; btn.style.color='#000'; btn.disabled=false; }, 3000);
+    setTimeout(()=>{ btn.textContent='📤 Carga inicial (312)'; btn.style.background='#2a2a2a'; btn.style.color='#aaa'; btn.disabled=false; }, 3000);
     alert('✅ 312 barrios subidos correctamente a Firebase en /barrios/');
   } catch(e) {
     alert('❌ Error: ' + e.message);
-    btn.textContent = '📤 Subir todos a Firebase';
+    btn.textContent = '📤 Carga inicial (312)';
     btn.disabled = false;
   }
 };
