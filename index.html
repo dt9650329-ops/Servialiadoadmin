@@ -1451,11 +1451,13 @@
   };
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
-  window.db = db;
-  window.dbRef = dbRef;
-  window.dbSet = set;
-  window.dbGet = get;
-  window.dbUpdate = update;
+  window.db        = db;
+  window.dbRef     = dbRef;
+  window.dbSet     = set;
+  window.dbGet     = get;
+  window.dbUpdate  = update;
+  window.dbRemove  = remove;
+  window.dbOnValue = onValue;
   const auth = getAuth(app);
   const storage = getStorage(app); 
   // ==================== VARIABLES GLOBALES ====================
@@ -4180,6 +4182,7 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
         <option value="10">C10 - Quimbaya</option>
       </select>
       <button onclick="abrirModalAgregarBarrio()" style="background:#FFC300;color:#000;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;">➕ Agregar Barrio</button>
+      <button onclick="abrirMapeador()" style="background:#4A9EFF;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:13px;">🗺️ Mapear Coordenadas</button>
       <button onclick="subirBarriosFirebase()" id="btn-subir-barrios" style="background:#2a2a2a;color:#aaa;border:1px solid #444;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:13px;" title="Carga inicial de los 312 barrios base">📤 Carga inicial (329)</button>
     </div>
   </div>
@@ -4246,46 +4249,86 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
     </div>
   </div>
 
-  <!-- MODAL AGREGAR BARRIO -->
-  <div id="modal-agregar-barrio" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;overflow-y:auto;">
-    <div style="background:#2a2a2a;margin:8% auto;padding:24px;border-radius:14px;max-width:420px;width:92%;border:1px solid #FFC300;">
-      <h3 style="color:#FFC300;margin:0 0 16px;">➕ Agregar Barrio / Conjunto</h3>
-      <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Nombre del barrio, conjunto o urbanización</label>
-      <input type="text" id="nuevo-barrio-nombre" placeholder="Ej: Conjunto Residencial El Lago" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;"/>
-      <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Zona</label>
-      <select id="nuevo-barrio-zona" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;">
-        <option value="">-- Selecciona zona --</option>
-        <option value="sur">🔴 Sur</option>
-        <option value="centro">🟡 Centro</option>
-        <option value="norte">🔵 Norte</option>
-        <option value="oriente">🟠 Oriente</option>
-        <option value="occidente">🟣 Occidente</option>
-      </select>
-      <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Comuna</label>
-      <select id="nuevo-barrio-comuna" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;">
-        <option value="">-- Selecciona comuna --</option>
-        <option value="1">C1 - Centenario</option>
-        <option value="2">C2 - Rufino José Cuervo Sur</option>
-        <option value="3">C3 - Alfonso López</option>
-        <option value="4">C4 - Francisco de Paula Santander</option>
-        <option value="5">C5 - El Bosque</option>
-        <option value="6">C6 - San José</option>
-        <option value="7">C7 - Cafetero</option>
-        <option value="8">C8 - Libertadores</option>
-        <option value="9">C9 - Fundadores</option>
-        <option value="10">C10 - Quimbaya</option>
-        <option value="otro">Otro / Fuera de Armenia</option>
-      </select>
-      <label style="color:#aaa;font-size:13px;display:block;margin-bottom:4px;">Coordenadas GPS <span style="color:#666;">(opcional)</span></label>
-      <div style="display:flex;gap:8px;margin-bottom:20px;">
-        <input type="number" step="0.000001" id="nuevo-barrio-lat" placeholder="Lat. Ej: 4.5339" style="flex:1;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:13px;box-sizing:border-box;"/>
-        <input type="number" step="0.000001" id="nuevo-barrio-lng" placeholder="Lng. Ej: -75.6811" style="flex:1;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:13px;box-sizing:border-box;"/>
+  <!-- MODAL AGREGAR BARRIO CON MAPA -->
+  <div id="modal-agregar-barrio" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;flex-direction:column;">
+    <div style="display:flex;flex-direction:column;height:100%;">
+
+      <!-- HEADER -->
+      <div style="background:#2a2a2a;border-bottom:1px solid #FFC300;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <span style="font-size:18px;">➕</span>
+        <div style="flex:1;">
+          <div style="font-weight:800;color:#FFC300;font-size:15px;">Agregar Barrio / Conjunto</div>
+          <div style="font-size:11px;color:#aaa;">Llena los datos → toca el mapa para fijar coordenadas → guarda</div>
+        </div>
+        <button onclick="cerrarModalAgregarBarrio()" style="background:#555;color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:18px;">✕</button>
       </div>
-      <div style="display:flex;gap:10px;">
-        <button onclick="guardarNuevoBarrio()" style="flex:1;background:#27ae60;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:15px;">💾 Guardar</button>
-        <button onclick="cerrarModalAgregarBarrio()" style="background:#555;color:#fff;border:none;padding:12px 16px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
+
+      <!-- BODY: formulario + mapa -->
+      <div style="display:flex;flex:1;overflow:hidden;min-height:0;">
+
+        <!-- FORMULARIO IZQUIERDA -->
+        <div style="width:300px;flex-shrink:0;background:#1a1a1a;padding:16px;overflow-y:auto;border-right:1px solid #333;">
+
+          <label style="color:#aaa;font-size:12px;display:block;margin-bottom:4px;">Nombre del barrio / conjunto</label>
+          <input type="text" id="nuevo-barrio-nombre" placeholder="Ej: Verdu 2, Torre El Lago..."
+            style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;"/>
+
+          <label style="color:#aaa;font-size:12px;display:block;margin-bottom:4px;">Zona</label>
+          <select id="nuevo-barrio-zona" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;">
+            <option value="">-- Selecciona zona --</option>
+            <option value="sur">🔴 Sur</option>
+            <option value="centro">🟡 Centro</option>
+            <option value="norte">🔵 Norte</option>
+            <option value="oriente">🟠 Oriente</option>
+            <option value="occidente">🟣 Occidente</option>
+          </select>
+
+          <label style="color:#aaa;font-size:12px;display:block;margin-bottom:4px;">Comuna</label>
+          <select id="nuevo-barrio-comuna" style="width:100%;background:#333;border:1px solid #555;color:#fff;padding:10px;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:12px;">
+            <option value="">-- Selecciona comuna --</option>
+            <option value="1">C1 - Centenario</option>
+            <option value="2">C2 - Rufino José Cuervo Sur</option>
+            <option value="3">C3 - Alfonso López</option>
+            <option value="4">C4 - Francisco de Paula Santander</option>
+            <option value="5">C5 - El Bosque</option>
+            <option value="6">C6 - San José</option>
+            <option value="7">C7 - Cafetero</option>
+            <option value="8">C8 - Libertadores</option>
+            <option value="9">C9 - Fundadores</option>
+            <option value="10">C10 - Quimbaya</option>
+            <option value="otro">Otro / Sin comuna</option>
+          </select>
+
+          <!-- Búsqueda en mapa -->
+          <label style="color:#aaa;font-size:12px;display:block;margin-bottom:4px;">🔍 Buscar en el mapa</label>
+          <div style="display:flex;gap:6px;margin-bottom:6px;">
+            <input type="text" id="buscar-nuevo-barrio" placeholder="Busca para centrarte..."
+              style="flex:1;background:#333;border:1px solid #555;color:#fff;padding:8px;border-radius:8px;font-size:13px;box-sizing:border-box;"
+              onkeydown="if(event.key==='Enter') buscarEnMapaNuevo()"/>
+            <button onclick="buscarEnMapaNuevo()" style="background:#4A9EFF;color:#fff;border:none;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;">🔍</button>
+          </div>
+          <div id="sugerencias-nuevo-barrio" style="background:#222;border:1px solid #444;border-radius:8px;margin-bottom:10px;overflow:hidden;display:none;"></div>
+
+          <!-- Coordenadas (se llenan al tocar el mapa) -->
+          <label style="color:#aaa;font-size:12px;display:block;margin-bottom:4px;">📍 Coordenadas <span style="color:#666;">(toca el mapa o escribe)</span></label>
+          <div style="display:flex;gap:6px;margin-bottom:16px;">
+            <input type="number" step="0.000001" id="nuevo-barrio-lat" placeholder="Lat: 4.5339"
+              style="flex:1;background:#333;border:1px solid #555;color:#fff;padding:8px;border-radius:8px;font-size:13px;box-sizing:border-box;"/>
+            <input type="number" step="0.000001" id="nuevo-barrio-lng" placeholder="Lng: -75.6811"
+              style="flex:1;background:#333;border:1px solid #555;color:#fff;padding:8px;border-radius:8px;font-size:13px;box-sizing:border-box;"/>
+          </div>
+
+          <div id="coords-preview-nuevo" style="background:#1b2a1b;border:1px solid #2a4a2a;border-radius:8px;padding:8px;font-size:12px;color:#7ec880;margin-bottom:14px;display:none;">
+            📍 Coordenadas fijadas en el mapa
+          </div>
+
+          <button onclick="guardarNuevoBarrio()" style="width:100%;background:#27ae60;color:#fff;border:none;padding:12px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:15px;margin-bottom:8px;">💾 Guardar en Firebase</button>
+          <p id="msg-agregar-barrio" style="text-align:center;margin-top:8px;font-size:13px;display:none;"></p>
+        </div>
+
+        <!-- MAPA DERECHA -->
+        <div id="mapa-nuevo-barrio" style="flex:1;min-height:0;min-width:0;"></div>
       </div>
-      <p id="msg-agregar-barrio" style="text-align:center;margin-top:12px;font-size:13px;display:none;"></p>
     </div>
   </div>
 
@@ -4338,15 +4381,15 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
 // ============================================================
 const BARRIOS_ADMIN = [
   // COMUNA 1 - CENTENARIO (Sur)
-  {n:"Arenales",z:"sur",c:"1",cn:"Centenario",lat:4.513656,lng:-75.68754},{n:"Arrayanes",z:"sur",c:"1",cn:"Centenario",lat:4.516769,lng:-75.69281},{n:"Bambuza",z:"sur",c:"1",cn:"Centenario",lat:4.502035,lng:-75.698594},{n:"Bloques de Bosques de Pinares",z:"sur",c:"1",cn:"Centenario",lat:4.512057,lng:-75.698345},{n:"Bosques de Pinares",z:"sur",c:"1",cn:"Centenario",lat:4.512697,lng:-75.693781},{n:"Castilla Grande",z:"sur",c:"1",cn:"Centenario",lat:4.512602,lng:-75.691133},{n:"Ciudadela Simón Bolivar",z:"sur",c:"1",cn:"Centenario",lat:4.506867,lng:-75.696917},{n:"Conjunto Balcones del Eden",z:"sur",c:"1",cn:"Centenario",lat:4.514467,lng:-75.696683},{n:"Conjunto Residencial Guaduales del Eden",z:"sur",c:"1",cn:"Centenario",lat:4.50616,lng:-75.69427},{n:"Conjunto Residencial la Villa",z:"sur",c:"1",cn:"Centenario",lat:4.517505,lng:-75.698069},{n:"El Emperador",z:"sur",c:"1",cn:"Centenario",lat:4.511334,lng:-75.690055},{n:"El Milagro",z:"sur",c:"1",cn:"Centenario"},{n:"El Palmar",z:"sur",c:"1",cn:"Centenario",lat:4.503092,lng:-75.698264},{n:"Genesis",z:"sur",c:"1",cn:"Centenario",lat:4.504319,lng:-75.696672},{n:"La Arcadia",z:"sur",c:"1",cn:"Centenario",lat:4.517992,lng:-75.700466},{n:"La Castilla",z:"sur",c:"1",cn:"Centenario",lat:4.514327,lng:-75.689215},{n:"La Isabela",z:"sur",c:"1",cn:"Centenario",lat:4.518297,lng:-75.694787},{n:"Conjunto Residencial la Villa",z:"sur",c:"1",cn:"Centenario",lat:4.517505,lng:-75.698069},{n:"Villa Maravelez",z:"sur",c:"1",cn:"Centenario",lat:4.517908,lng:-75.699777},{n:"Nuestra Señora de la Paz",z:"sur",c:"1",cn:"Centenario",lat:4.501171,lng:-75.698764},{n:"Parque de la Villa",z:"sur",c:"1",cn:"Centenario",lat:4.516494,lng:-75.6957},{n:"Pinares",z:"sur",c:"1",cn:"Centenario",lat:4.510512,lng:-75.69267},{n:"Portal de Pinares",z:"sur",c:"1",cn:"Centenario",lat:4.510701,lng:-75.701232},{n:"Portal del Eden",z:"sur",c:"1",cn:"Centenario",lat:4.505143,lng:-75.694707},{n:"Santa María del Parque",z:"sur",c:"1",cn:"Centenario",lat:4.517033,lng:-75.696007},{n:"Tres Esquinas",z:"sur",c:"1",cn:"Centenario",lat:4.519129,lng:-75.68905},{n:"Urbanización Cañas Gordas",z:"sur",c:"1",cn:"Centenario",lat:4.507621,lng:-75.695138},{n:"Guaduales de la Villa",z:"sur",c:"1",cn:"Centenario",lat:4.514003,lng:-75.702884},{n:"Urbanización la Linda",z:"sur",c:"1",cn:"Centenario",lat:4.512761,lng:-75.705351},{n:"Villa del Centenario",z:"sur",c:"1",cn:"Centenario",lat:4.512982,lng:-75.703419},{n:"Vista Hermosa",z:"sur",c:"1",cn:"Centenario",lat:4.503559,lng:-75.695616},
+  {n:"Arenales",z:"sur",c:"1",cn:"Centenario"},{n:"Arrayanes",z:"sur",c:"1",cn:"Centenario"},{n:"Bambuza",z:"sur",c:"1",cn:"Centenario"},{n:"Bloques de Bosques de Pinares",z:"sur",c:"1",cn:"Centenario"},{n:"Bosques de Pinares",z:"sur",c:"1",cn:"Centenario"},{n:"Castilla Grande",z:"sur",c:"1",cn:"Centenario"},{n:"Ciudadela Simón Bolivar",z:"sur",c:"1",cn:"Centenario"},{n:"Conjunto Balcones del Eden",z:"sur",c:"1",cn:"Centenario"},{n:"Conjunto Residencial Guaduales del Eden",z:"sur",c:"1",cn:"Centenario"},{n:"Conjunto Residencial la Villa",z:"sur",c:"1",cn:"Centenario"},{n:"El Emperador",z:"sur",c:"1",cn:"Centenario"},{n:"El Milagro",z:"sur",c:"1",cn:"Centenario"},{n:"El Palmar",z:"sur",c:"1",cn:"Centenario"},{n:"Genesis",z:"sur",c:"1",cn:"Centenario"},{n:"La Arcadia",z:"sur",c:"1",cn:"Centenario"},{n:"La Castilla",z:"sur",c:"1",cn:"Centenario"},{n:"La Isabela",z:"sur",c:"1",cn:"Centenario"},{n:"Conjunto Residencial la Villa",z:"sur",c:"1",cn:"Centenario"},{n:"Villa Maravelez",z:"sur",c:"1",cn:"Centenario"},{n:"Nuestra Señora de la Paz",z:"sur",c:"1",cn:"Centenario"},{n:"Parque de la Villa",z:"sur",c:"1",cn:"Centenario"},{n:"Pinares",z:"sur",c:"1",cn:"Centenario"},{n:"Portal de Pinares",z:"sur",c:"1",cn:"Centenario"},{n:"Portal del Eden",z:"sur",c:"1",cn:"Centenario"},{n:"Santa María del Parque",z:"sur",c:"1",cn:"Centenario"},{n:"Tres Esquinas",z:"sur",c:"1",cn:"Centenario"},{n:"Urbanización Cañas Gordas",z:"sur",c:"1",cn:"Centenario"},{n:"Guaduales de la Villa",z:"sur",c:"1",cn:"Centenario"},{n:"Urbanización la Linda",z:"sur",c:"1",cn:"Centenario"},{n:"Villa del Centenario",z:"sur",c:"1",cn:"Centenario"},{n:"Vista Hermosa",z:"sur",c:"1",cn:"Centenario"},
   // COMUNA 2 - RUFINO JOSÉ CUERVO SUR (Sur)
-  {n:"14 de Octubre",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.519546,lng:-75.700674},{n:"19 de Enero",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.522899,lng:-75.684706},{n:"8 de Marzo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.525675,lng:-75.69856},{n:"Alcázar del Cafe",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.521845,lng:-75.714591},{n:"Antonio Nariño",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.525493,lng:-75.707101},{n:"Barrio Calima",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.52354,lng:-75.698865},{n:"Barrio la Milagrosa",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.525792,lng:-75.696651},{n:"Barrio Zuldemaida",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.52515,lng:-75.701263},{n:"San Vicente de Paul",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.525068,lng:-75.699591},{n:"Bello Horizonte",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.520063,lng:-75.701446},{n:"Conjunto Residencial El Porvenir",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.524455,lng:-75.697754},{n:"Bosques de Gibraltar",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.524017,lng:-75.7143},{n:"Ciudadela Puerto Espejo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.517342,lng:-75.712507},{n:"Urbanización Cristales",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.523876,lng:-75.694583},{n:"El Carmelo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.519139,lng:-75.703255},{n:"El Poblado",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.516102,lng:-75.714986},{n:"El Tesorito",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.514263,lng:-75.710748},{n:"Farallones",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.521004,lng:-75.691511},{n:"Gibraltar",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.525194,lng:-75.710191},{n:"Jesus María Ocampo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.521407,lng:-75.69546},{n:"La Fachada",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.520128,lng:-75.714362},{n:"La Virginia",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.516006,lng:-75.709708},{n:"Las Acacias",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.523087,lng:-75.690975},{n:"Las Brisas",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.520555,lng:-75.699944},{n:"Las Veraneras",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.524122,lng:-75.704054},{n:"Los Naranjos",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.520038,lng:-75.698367},{n:"Los Quindos 1",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.522113,lng:-75.701674},{n:"Los Quindos 2",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.52329,lng:-75.704462},{n:"Los Quindos 3",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.522258,lng:-75.706123},{n:"Luis Carlos Galan",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.523078,lng:-75.697187},{n:"Manantiales",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.520822,lng:-75.710501},{n:"Marco Fidel Suarez",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.523472,lng:-75.698013},{n:"Nuevo Horizonte",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Patricia",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"San Francisco",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.521167,lng:-75.698642},{n:"Santa Rita",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.517763,lng:-75.706167},{n:"Serranías",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.521335,lng:-75.697198},{n:"Girasoles",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.525375,lng:-75.695116},{n:"La Fachada",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.520128,lng:-75.714362},{n:"Lindaraja 1",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.519213,lng:-75.707249},{n:"Lindaraja 2",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.518895,lng:-75.708505},{n:"Veracruz",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Villa Alejandra",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Villa Claudia",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.520515,lng:-75.697009},{n:"Villa de la Vida y el Trabajo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.51831,lng:-75.710809},{n:"Villa del Carmen",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.520256,lng:-75.703077},
+  {n:"14 de Octubre",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"19 de Enero",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"8 de Marzo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Alcázar del Cafe",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Antonio Nariño",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Barrio Calima",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Barrio la Milagrosa",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Barrio Zuldemaida",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"San Vicente de Paul",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Bello Horizonte",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Conjunto Residencial El Porvenir",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Bosques de Gibraltar",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Ciudadela Puerto Espejo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Urbanización Cristales",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"El Carmelo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"El Poblado",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"El Tesorito",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Farallones",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Gibraltar",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Jesus María Ocampo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"La Fachada",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"La Virginia",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Las Acacias",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Las Brisas",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Las Veraneras",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Los Naranjos",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Los Quindos 1",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Los Quindos 2",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Los Quindos 3",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Luis Carlos Galan",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Manantiales",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Marco Fidel Suarez",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Nuevo Horizonte",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Patricia",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"San Francisco",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Santa Rita",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Serranías",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Girasoles",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"La Fachada",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Lindaraja 1",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Lindaraja 2",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Veracruz",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Villa Alejandra",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Villa Claudia",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Villa de la Vida y el Trabajo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Villa del Carmen",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},
   // COMUNA 3 - ALFONSO LÓPEZ (Sur)
-  {n:"Alfonso López",z:"sur",c:"3",cn:"Alfonso López"},{n:"Arcades",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio 13 de Junio",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio 25 de Mayo",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Arcoíris",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Belén",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Ciudadela",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Cooperativo",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio El Placer",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Adiela",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Alhambra",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Esmeralda",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Miranda",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Los Kioscos",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Manuela Beltrán",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Mesón de Sinaí",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Santa María",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Villa Hermosa",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Villa Laura",z:"sur",c:"3",cn:"Alfonso López"},{n:"Bosques de Viena",z:"sur",c:"3",cn:"Alfonso López"},{n:"Casablanca",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudad Dorada",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudadela Nuevo Armenia III",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudadela Nuevo Armenia",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudadela Nuevo Armenia II",z:"sur",c:"3",cn:"Alfonso López"},{n:"Conjunto Residencial Montecarlo",z:"sur",c:"3",cn:"Alfonso López",lat:4.51099,lng:-75.697316},{n:"Conjunto Residencial Sinaí",z:"sur",c:"3",cn:"Alfonso López"},{n:"Cordillera",z:"sur",c:"3",cn:"Alfonso López"},{n:"La Cecilia",z:"sur",c:"3",cn:"Alfonso López"},{n:"La Cristalina",z:"sur",c:"3",cn:"Alfonso López"},{n:"Nuevo Placer",z:"sur",c:"3",cn:"Alfonso López"},{n:"Quintas de la Marina",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización La Grecia",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Las Colinas",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Loma Verde",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Nuevo Amanecer",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización San Diego",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Villa Ángela",z:"sur",c:"3",cn:"Alfonso López"},{n:"Villa Italia",z:"sur",c:"3",cn:"Alfonso López"},
+  {n:"Alfonso López",z:"sur",c:"3",cn:"Alfonso López"},{n:"Arcades",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio 13 de Junio",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio 25 de Mayo",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Arcoíris",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Belén",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Ciudadela",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Cooperativo",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio El Placer",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Adiela",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Alhambra",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Esmeralda",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio La Miranda",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Los Kioscos",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Manuela Beltrán",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Mesón de Sinaí",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Santa María",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Villa Hermosa",z:"sur",c:"3",cn:"Alfonso López"},{n:"Barrio Villa Laura",z:"sur",c:"3",cn:"Alfonso López"},{n:"Bosques de Viena",z:"sur",c:"3",cn:"Alfonso López"},{n:"Casablanca",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudad Dorada",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudadela Nuevo Armenia III",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudadela Nuevo Armenia",z:"sur",c:"3",cn:"Alfonso López"},{n:"Ciudadela Nuevo Armenia II",z:"sur",c:"3",cn:"Alfonso López"},{n:"Conjunto Residencial Montecarlo",z:"sur",c:"3",cn:"Alfonso López"},{n:"Conjunto Residencial Sinaí",z:"sur",c:"3",cn:"Alfonso López"},{n:"Cordillera",z:"sur",c:"3",cn:"Alfonso López"},{n:"La Cecilia",z:"sur",c:"3",cn:"Alfonso López"},{n:"La Cristalina",z:"sur",c:"3",cn:"Alfonso López"},{n:"Nuevo Placer",z:"sur",c:"3",cn:"Alfonso López"},{n:"Quintas de la Marina",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización La Grecia",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Las Colinas",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Loma Verde",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Nuevo Amanecer",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización San Diego",z:"sur",c:"3",cn:"Alfonso López"},{n:"Urbanización Villa Ángela",z:"sur",c:"3",cn:"Alfonso López"},{n:"Villa Italia",z:"sur",c:"3",cn:"Alfonso López"},
   // COMUNA 4 - FRANCISCO DE PAULA SANTANDER (Oriente)
   {n:"Barrio Brasilia",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Beléncito",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Brasilia Nueva",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Cincuentenario",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio El Prado",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Gaitán",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Miraflores",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Miraflores Bajo",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Obrero",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Popular",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Santa Fe",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Santa Helena",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Barrio Santander",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"El Refugio",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"San José Sur",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Sector Boyacá",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Villa del Café",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},{n:"Villa Juliana",z:"oriente",c:"4",cn:"Francisco de Paula Santander"},
   // COMUNA 5 - EL BOSQUE (Oriente)
-  {n:"1 de Mayo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Artesanos",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio 7 de Agosto",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Berlín",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio El Recreo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Kennedy",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio La Unión",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Monteprado",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Montevideo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Nueva Libertad",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Salazar",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Villa Liliana",z:"oriente",c:"5",cn:"El Bosque"},{n:"Casas Fiscales",z:"oriente",c:"5",cn:"El Bosque"},{n:"La Anunciación",z:"oriente",c:"5",cn:"El Bosque"},{n:"Montevideo Bajo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Nuevo Recreo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Palmares del Recreo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Urbanización El Silencio I",z:"oriente",c:"5",cn:"El Bosque",lat:4.5418,lng:-75.6572},{n:"Urbanización El Silencio II",z:"oriente",c:"5",cn:"El Bosque",lat:4.5405,lng:-75.6585},
+  {n:"1 de Mayo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Artesanos",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio 7 de Agosto",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Berlín",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio El Recreo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Kennedy",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio La Unión",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Monteprado",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Montevideo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Nueva Libertad",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Salazar",z:"oriente",c:"5",cn:"El Bosque"},{n:"Barrio Villa Liliana",z:"oriente",c:"5",cn:"El Bosque"},{n:"Casas Fiscales",z:"oriente",c:"5",cn:"El Bosque"},{n:"La Anunciación",z:"oriente",c:"5",cn:"El Bosque"},{n:"Montevideo Bajo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Nuevo Recreo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Palmares del Recreo",z:"oriente",c:"5",cn:"El Bosque"},{n:"Urbanización El Silencio I",z:"oriente",c:"5",cn:"El Bosque"},{n:"Urbanización El Silencio II",z:"oriente",c:"5",cn:"El Bosque"},
   // COMUNA 6 - SAN JOSÉ (Occidente)
   {n:"Barrio La Clarita",z:"occidente",c:"6",cn:"San José"},{n:"Barrio La Patria",z:"occidente",c:"6",cn:"San José"},{n:"Barrio Las Américas",z:"occidente",c:"6",cn:"San José"},{n:"Barrio Los Cámbulos",z:"occidente",c:"6",cn:"San José"},{n:"Barrio Quindío",z:"occidente",c:"6",cn:"San José"},{n:"Barrio Universal",z:"occidente",c:"6",cn:"San José"},{n:"Barrio San José",z:"occidente",c:"6",cn:"San José"},{n:"Carolina I",z:"occidente",c:"6",cn:"San José"},{n:"Condominio San José de la Sierra",z:"occidente",c:"6",cn:"San José"},{n:"Conjunto Residencial Aldea de los Comuneros",z:"occidente",c:"6",cn:"San José"},{n:"Conjunto Residencial Villa Jardín",z:"occidente",c:"6",cn:"San José"},{n:"El Parque I",z:"occidente",c:"6",cn:"San José"},{n:"El Parque II",z:"occidente",c:"6",cn:"San José"},{n:"Gustavo Rojas Pinilla I",z:"occidente",c:"6",cn:"San José"},{n:"Gustavo Rojas Pinilla II",z:"occidente",c:"6",cn:"San José"},{n:"La Montaña",z:"occidente",c:"6",cn:"San José"},{n:"Los Almendros",z:"occidente",c:"6",cn:"San José"},{n:"Los Andes I",z:"occidente",c:"6",cn:"San José"},{n:"Quintas de Juliana",z:"occidente",c:"6",cn:"San José"},{n:"Rincón de los Andes",z:"occidente",c:"6",cn:"San José"},{n:"Santa Sofía",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Altos de la Pavona",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización El Cortijo",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización La Irlanda",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización La Pavona",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Monteblanco I Etapa",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Monteblanco II Etapa",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Monteblanco III Etapa",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Quintas de los Andes",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización San Andrés",z:"occidente",c:"6",cn:"San José"},{n:"Urbanización Villa Andrea",z:"occidente",c:"6",cn:"San José"},{n:"Vaguita de Tigreros",z:"occidente",c:"6",cn:"San José"},{n:"Villa Carolina II",z:"occidente",c:"6",cn:"San José"},{n:"Villa Celmira",z:"occidente",c:"6",cn:"San José"},{n:"Villa de las Américas",z:"occidente",c:"6",cn:"San José"},{n:"Villa Ximena",z:"occidente",c:"6",cn:"San José"},
   // COMUNA 7 - CAFETERO (Centro)
@@ -4356,9 +4399,9 @@ const BARRIOS_ADMIN = [
   // COMUNA 9 - FUNDADORES (Norte)
   {n:"Altos del Niágara",z:"norte",c:"9",cn:"Fundadores"},{n:"Bajo Niágara",z:"norte",c:"9",cn:"Fundadores"},{n:"Barrio Las 60 Casas",z:"norte",c:"9",cn:"Fundadores"},{n:"Barrio Los Álamos",z:"norte",c:"9",cn:"Fundadores"},{n:"Barrio Modelo",z:"norte",c:"9",cn:"Fundadores"},{n:"Barrio Vieja Libertad",z:"norte",c:"9",cn:"Fundadores"},{n:"Ciudadela Sorrento",z:"norte",c:"9",cn:"Fundadores"},{n:"Conjunto El Remanso",z:"norte",c:"9",cn:"Fundadores"},{n:"Conjunto Residencial Nisa Bulevar",z:"norte",c:"9",cn:"Fundadores"},{n:"Conjunto Residencial Palmas del Modelo",z:"norte",c:"9",cn:"Fundadores"},{n:"Conjunto Residencial Guayacanes",z:"norte",c:"9",cn:"Fundadores"},{n:"Edificio Alto de las Palmas",z:"norte",c:"9",cn:"Fundadores"},{n:"Edificio Torres del Granada",z:"norte",c:"9",cn:"Fundadores"},{n:"Gran Bretaña",z:"norte",c:"9",cn:"Fundadores"},{n:"Granada",z:"norte",c:"9",cn:"Fundadores"},{n:"La Arboleda",z:"norte",c:"9",cn:"Fundadores"},{n:"La Cabaña",z:"norte",c:"9",cn:"Fundadores"},{n:"Las Palmas",z:"norte",c:"9",cn:"Fundadores"},{n:"Quintas del Yulima",z:"norte",c:"9",cn:"Fundadores"},{n:"Rincón de Yulima",z:"norte",c:"9",cn:"Fundadores"},{n:"Yulima I",z:"norte",c:"9",cn:"Fundadores"},{n:"Yulima II",z:"norte",c:"9",cn:"Fundadores"},{n:"Yulima III",z:"norte",c:"9",cn:"Fundadores"},
   // COMUNA 10 - QUIMBAYA (Norte)
-  {n:"Asentamiento Los Fundadores",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Alcázar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio El Nogal",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Fundadores",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Galán",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Campiña",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Lorena",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Nueva Cecilia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Suiza",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Laureles",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Los Profesionales",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Mercedes del Norte",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Nueva Cecilia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Providencia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Salvador Allende",z:"norte",c:"10",cn:"Quimbaya"},{n:"Bloques Palmas de Sorrento",z:"norte",c:"10",cn:"Quimbaya"},{n:"Ciudadela Quimbaya",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio Altos del Bosque",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio Caminos de Calay",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio El Alcázar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio El Molino",z:"norte",c:"10",cn:"Quimbaya"},{n:"El Palmar",z:"norte",c:"10",cn:"Quimbaya",lat:4.503092,lng:-75.698264},{n:"Condominio La Hacienda",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Cerrado Caminos de San Lorenzo",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Multifamiliar Providencia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Alejandría",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Bosques de Palermo",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Bosques de San Martín",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Bulevar del Coliseo",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Casa Loma",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Coinca",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial El Retiro",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Jardín de las Mercedes",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Abadía",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Alquería",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Estancia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Hacienda Palmacera",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Las Lomas",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Los Andes",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Pasadena Country",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Plazoleta Andina",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Portal de la Colonia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Rincón de Andalucía",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Torres de Marfil",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Torres del Alcázar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Santillana del Mar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Rincón de la Samaria",z:"norte",c:"10",cn:"Quimbaya"},{n:"Las Veraneras",z:"norte",c:"10",cn:"Quimbaya",lat:4.524122,lng:-75.704054},{n:"Proviteq Unidad I",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad II",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad III",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad IV",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad V",z:"norte",c:"10",cn:"Quimbaya"},{n:"Sector Bavaria",z:"norte",c:"10",cn:"Quimbaya"},{n:"Ciudadela Simón Bolivar",z:"norte",c:"10",cn:"Quimbaya",lat:4.506867,lng:-75.696917},{n:"Torres Providencia I",z:"norte",c:"10",cn:"Quimbaya"},{n:"Torres Providencia II",z:"norte",c:"10",cn:"Quimbaya"},{n:"Urbanización Bosques de Viena",z:"norte",c:"10",cn:"Quimbaya"},{n:"Urbanización La Aurora",z:"norte",c:"10",cn:"Quimbaya"},{n:"Urbanización La Mariela",z:"norte",c:"10",cn:"Quimbaya"},
+  {n:"Asentamiento Los Fundadores",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Alcázar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio El Nogal",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Fundadores",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Galán",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Campiña",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Lorena",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Nueva Cecilia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio La Suiza",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Laureles",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Los Profesionales",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Mercedes del Norte",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Nueva Cecilia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Providencia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Barrio Salvador Allende",z:"norte",c:"10",cn:"Quimbaya"},{n:"Bloques Palmas de Sorrento",z:"norte",c:"10",cn:"Quimbaya"},{n:"Ciudadela Quimbaya",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio Altos del Bosque",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio Caminos de Calay",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio El Alcázar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio El Molino",z:"norte",c:"10",cn:"Quimbaya"},{n:"El Palmar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Condominio La Hacienda",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Cerrado Caminos de San Lorenzo",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Multifamiliar Providencia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Alejandría",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Bosques de Palermo",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Bosques de San Martín",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Bulevar del Coliseo",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Casa Loma",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Coinca",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial El Retiro",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Jardín de las Mercedes",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Abadía",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Alquería",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Estancia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial La Hacienda Palmacera",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Las Lomas",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Los Andes",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Pasadena Country",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Plazoleta Andina",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Portal de la Colonia",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Rincón de Andalucía",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Torres de Marfil",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Torres del Alcázar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Santillana del Mar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Conjunto Residencial Rincón de la Samaria",z:"norte",c:"10",cn:"Quimbaya"},{n:"Las Veraneras",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad I",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad II",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad III",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad IV",z:"norte",c:"10",cn:"Quimbaya"},{n:"Proviteq Unidad V",z:"norte",c:"10",cn:"Quimbaya"},{n:"Sector Bavaria",z:"norte",c:"10",cn:"Quimbaya"},{n:"Ciudadela Simón Bolivar",z:"norte",c:"10",cn:"Quimbaya"},{n:"Torres Providencia I",z:"norte",c:"10",cn:"Quimbaya"},{n:"Torres Providencia II",z:"norte",c:"10",cn:"Quimbaya"},{n:"Urbanización Bosques de Viena",z:"norte",c:"10",cn:"Quimbaya"},{n:"Urbanización La Aurora",z:"norte",c:"10",cn:"Quimbaya"},{n:"Urbanización La Mariela",z:"norte",c:"10",cn:"Quimbaya"},
   // 🆕 BARRIOS ADICIONALES CON COORDENADAS
-  {n:"Chilacoa",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.513506,lng:-75.715244},{n:"La Coruña",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.513746,lng:-75.713351},{n:"Verdencanto",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.517657,lng:-75.718661},{n:"Verdu 1",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.517607,lng:-75.716114},{n:"Verdu 2",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.517846,lng:-75.717325},{n:"Camino de Cocora",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.518533,lng:-75.716671},{n:"Oviedo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.516225,lng:-75.716695},{n:"Ciudadela Confenalco",z:"sur",c:"1",cn:"Centenario",lat:4.515728,lng:-75.703896},{n:"Conjunto Residencial Aguazul",z:"sur",c:"1",cn:"Centenario",lat:4.516356,lng:-75.701616},{n:"Conjunto Residencial Zazacuari",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.518387,lng:-75.718543},{n:"Conjunto Residencial Ribadeo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.512839,lng:-75.71431},{n:"Conjunto Residencial Inter Sur",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.513367,lng:-75.71401},{n:"Parque Residencial Aires del Bosque",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.522883,lng:-75.715051},{n:"Conjunto Residencial Caminos del Bosque",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.523229,lng:-75.712948},{n:"Conjunto Residencial El Cielo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur",lat:4.512608,lng:-75.71504},{n:"Ciudadela Montecarlo Girasoles",z:"sur",c:"1",cn:"Centenario",lat:4.51099,lng:-75.697316},{n:"Ciudadela Montecarlo Abedules",z:"sur",c:"1",cn:"Centenario",lat:4.510687,lng:-75.698282},
+  {n:"Chilacoa",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"La Coruña",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Verdencanto",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Verdu 1",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Verdu 2",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Camino de Cocora",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Oviedo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Ciudadela Confenalco",z:"sur",c:"1",cn:"Centenario"},{n:"Conjunto Residencial Aguazul",z:"sur",c:"1",cn:"Centenario"},{n:"Conjunto Residencial Zazacuari",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Conjunto Residencial Ribadeo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Conjunto Residencial Inter Sur",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Parque Residencial Aires del Bosque",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Conjunto Residencial Caminos del Bosque",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Conjunto Residencial El Cielo",z:"sur",c:"2",cn:"Rufino José Cuervo Sur"},{n:"Ciudadela Montecarlo Girasoles",z:"sur",c:"1",cn:"Centenario"},{n:"Ciudadela Montecarlo Abedules",z:"sur",c:"1",cn:"Centenario"},
   {n:"Urbanización Los Tulipanes",z:"norte",c:"10",cn:"Quimbaya"}
 ];
 
@@ -4448,7 +4491,7 @@ let _ubicFueraCache = [];
 
 function cargarUbicacionesFuera() {
   if (!window.db) return;
-  onValue(dbRef(db, 'barrios'), snap => {
+  window.dbOnValue(window.dbRef(window.db, 'barrios'), snap => {
     const data = snap.val() || {};
     _ubicFueraCache = Object.entries(data)
       .filter(([,v]) => v.zona === 'fuera' || v.comuna === 'ext')
@@ -4538,7 +4581,7 @@ window.guardarUbicacionFuera = async function() {
   try {
     msg.textContent = '⏳ Guardando...';
     msg.style.color = '#FFC300'; msg.style.display = 'block';
-    await set(dbRef(db, 'barrios/' + id), {
+    await window.dbSet(window.dbRef(window.db, 'barrios/' + id), {
       nombre, tipo, zona: 'fuera', comuna: 'ext',
       nombreComuna: 'Fuera de Armenia',
       municipioRef: munRef || '',
@@ -4561,15 +4604,46 @@ window.guardarUbicacionFuera = async function() {
 window.eliminarUbicacionFuera = async function(id) {
   if (!confirm('¿Eliminar esta ubicación?')) return;
   try {
-    await remove(dbRef(db, 'barrios/' + id));
+    await window.dbRemove(window.dbRef(window.db, 'barrios/' + id));
     cargarUbicacionesFuera();
   } catch(e) { alert('Error: ' + e.message); }
 };
 
+let _mapNuevoBarrio = null;
+let _pinNuevoBarrio = null;
+
 window.abrirModalAgregarBarrio = function() {
-  document.getElementById('modal-agregar-barrio').style.display = 'block';
-  document.getElementById('nuevo-barrio-nombre').focus();
+  const modal = document.getElementById('modal-agregar-barrio');
+  modal.style.display = 'flex';
   document.getElementById('msg-agregar-barrio').style.display = 'none';
+  document.getElementById('coords-preview-nuevo').style.display = 'none';
+  setTimeout(() => {
+    if (!_mapNuevoBarrio) {
+      _mapNuevoBarrio = L.map('mapa-nuevo-barrio', { zoomControl: true }).setView([4.5339, -75.6811], 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(_mapNuevoBarrio);
+      _mapNuevoBarrio.on('click', function(e) {
+        const lat = parseFloat(e.latlng.lat.toFixed(6));
+        const lng = parseFloat(e.latlng.lng.toFixed(6));
+        document.getElementById('nuevo-barrio-lat').value = lat;
+        document.getElementById('nuevo-barrio-lng').value = lng;
+        if (_pinNuevoBarrio) _mapNuevoBarrio.removeLayer(_pinNuevoBarrio);
+        _pinNuevoBarrio = L.marker([lat, lng], {
+          icon: L.divIcon({
+            className: '',
+            html: `<div style="background:#FFC300;width:36px;height:36px;border-radius:50%;border:4px solid white;box-shadow:0 4px 15px rgba(255,195,0,.8);display:flex;align-items:center;justify-content:center;font-size:18px;">📍</div>`,
+            iconSize: [36, 36], iconAnchor: [18, 18]
+          })
+        }).addTo(_mapNuevoBarrio);
+        const nombre = document.getElementById('nuevo-barrio-nombre').value.trim() || '(sin nombre)';
+        _pinNuevoBarrio.bindPopup(`<b style="color:#FFC300">${nombre}</b><br><small>${lat}, ${lng}</small>`).openPopup();
+        const prev = document.getElementById('coords-preview-nuevo');
+        prev.textContent = `📍 ${lat}, ${lng} — toca "Guardar" para confirmar`;
+        prev.style.display = 'block';
+      });
+    }
+    _mapNuevoBarrio.invalidateSize();
+    document.getElementById('nuevo-barrio-nombre').focus();
+  }, 200);
 };
 
 window.cerrarModalAgregarBarrio = function() {
@@ -4579,6 +4653,34 @@ window.cerrarModalAgregarBarrio = function() {
   document.getElementById('nuevo-barrio-comuna').value = '';
   document.getElementById('nuevo-barrio-lat').value = '';
   document.getElementById('nuevo-barrio-lng').value = '';
+  document.getElementById('buscar-nuevo-barrio').value = '';
+  document.getElementById('sugerencias-nuevo-barrio').style.display = 'none';
+  document.getElementById('coords-preview-nuevo').style.display = 'none';
+  if (_pinNuevoBarrio) { _mapNuevoBarrio.removeLayer(_pinNuevoBarrio); _pinNuevoBarrio = null; }
+};
+
+window.buscarEnMapaNuevo = async function() {
+  const q = document.getElementById('buscar-nuevo-barrio').value.trim();
+  if (!q) return;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+', Armenia, Quindío, Colombia')}&limit=5&countrycodes=co&accept-language=es`;
+    const res = await fetch(url).then(r => r.json());
+    const sug = document.getElementById('sugerencias-nuevo-barrio');
+    if (!res || !res.length) { sug.style.display = 'none'; return; }
+    sug.style.display = 'block';
+    sug.innerHTML = res.map(r => {
+      const p = r.display_name.split(',')[0];
+      return `<div onclick="window._elegirSugNuevo(${r.lat},${r.lon})"
+        style="padding:8px 12px;cursor:pointer;font-size:13px;color:#e8eaf0;border-bottom:1px solid #333;"
+        onmouseover="this.style.background='#2a2d3a'" onmouseout="this.style.background='transparent'">
+        📍 ${p}</div>`;
+    }).join('');
+  } catch(e) {}
+};
+
+window._elegirSugNuevo = function(lat, lng) {
+  _mapNuevoBarrio.setView([parseFloat(lat), parseFloat(lng)], 17);
+  document.getElementById('sugerencias-nuevo-barrio').style.display = 'none';
 };
 
 window.guardarNuevoBarrio = async function() {
@@ -4612,7 +4714,7 @@ window.guardarNuevoBarrio = async function() {
     msg.style.color = '#FFC300';
     msg.style.display = 'block';
 
-    await set(dbRef(db, 'barrios/' + id), {
+    await window.dbSet(window.dbRef(window.db, 'barrios/' + id), {
       nombre:       nombre,
       zona:         zona,
       comuna:       comuna,
@@ -4645,18 +4747,258 @@ document.getElementById('modal-agregar-barrio')?.addEventListener('click', e => 
   if (e.target === document.getElementById('modal-agregar-barrio')) cerrarModalAgregarBarrio();
 });
 
+// ══════════════════════════════════════════════════════
+//  🗺️ MAPEADOR DE COORDENADAS — DISEÑO VERTICAL MÓVIL
+// ══════════════════════════════════════════════════════
+let _mapModal = null;
+let _pinTempModal = null;
+let _barrioSeleccionado = null;
+let _barriosFB = {};
+let _panelMapeadorAbierto = false;
+
+window.abrirMapeador = function() {
+  document.getElementById('modal-mapeador').style.display = 'flex';
+  setTimeout(() => {
+    if (!_mapModal) {
+      _mapModal = L.map('mapa-modal', { zoomControl: true }).setView([4.5339, -75.6811], 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(_mapModal);
+      _mapModal.on('click', _onMapClick);
+    }
+    _mapModal.invalidateSize();
+    _cargarBarriosFB();
+  }, 200);
+};
+
+window.cerrarMapeador = function() {
+  document.getElementById('modal-mapeador').style.display = 'none';
+  _panelMapeadorAbierto = false;
+  const panel = document.getElementById('panel-mapeador');
+  if (panel) panel.style.transform = 'translateY(calc(100% - 52px))';
+};
+
+window._togglePanelMapeador = function() {
+  _panelMapeadorAbierto = !_panelMapeadorAbierto;
+  const panel = document.getElementById('panel-mapeador');
+  const arrow = document.getElementById('panel-mapeador-arrow');
+  panel.style.transform = _panelMapeadorAbierto ? 'translateY(0)' : 'translateY(calc(100% - 52px))';
+  if (arrow) arrow.textContent = _panelMapeadorAbierto ? '▼' : '▲';
+};
+
+function _cargarBarriosFB() {
+  if (!window.db) return;
+  window.dbOnValue(window.dbRef(window.db, 'barrios'), snap => {
+    _barriosFB = snap.val() || {};
+    _renderListaMapeador();
+  }, { onlyOnce: true });
+}
+
+function _renderListaMapeador() {
+  const filtro = (document.getElementById('filtro-mapeador')?.value || '').toLowerCase().trim();
+  const zonaf  = document.getElementById('filtro-zona-mapeador')?.value || '';
+  const lista  = document.getElementById('lista-mapeador');
+  if (!lista) return;
+
+  const items = Object.entries(_barriosFB)
+    .filter(([, v]) => v.zona !== 'fuera' && v.comuna !== 'ext')
+    .filter(([, v]) => !filtro || (v.nombre||'').toLowerCase().includes(filtro))
+    .filter(([, v]) => !zonaf || v.zona === zonaf)
+    .sort((a, b) => {
+      const aOk = !!(a[1].lat && a[1].lng);
+      const bOk = !!(b[1].lat && b[1].lng);
+      if (aOk !== bOk) return aOk ? 1 : -1;
+      return (a[1].nombre||'').localeCompare(b[1].nombre||'');
+    });
+
+  const sinCoords = items.filter(([,v]) => !v.lat).length;
+  const conCoords = items.filter(([,v]) => v.lat).length;
+  const count = document.getElementById('panel-mapeador-count');
+  if (count) count.textContent = items.length;
+  document.getElementById('stats-mapeador').innerHTML =
+    `<span style="color:#e74c3c;">⏳ Sin coords: <b>${sinCoords}</b></span>&nbsp;&nbsp;` +
+    `<span style="color:#27ae60;">✅ Con coords: <b>${conCoords}</b></span>`;
+
+  if (!items.length) {
+    lista.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">No hay barrios.</p>';
+    return;
+  }
+
+  lista.innerHTML = items.map(([id, v]) => {
+    const ok = !!(v.lat && v.lng);
+    return `<div id="item-${id}" onclick="seleccionarBarrioMapeador('${id}')"
+      style="padding:10px 14px;border-bottom:1px solid #2a2d38;cursor:pointer;display:flex;align-items:center;gap:10px;
+      background:${_barrioSeleccionado===id?'#1a2a3a':'transparent'};transition:background .15s;">
+      <div style="width:12px;height:12px;border-radius:50%;flex-shrink:0;background:${ok?'#27ae60':'#e74c3c'};"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:600;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${v.nombre||id}</div>
+        <div style="font-size:11px;color:#7c8098;">${ok ? `📍 ${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}` : 'Sin coordenadas'} · ${v.zona||'?'}</div>
+      </div>
+      ${_barrioSeleccionado===id ? '<span style="color:#FFC300;font-size:16px;">✓</span>' : ''}
+    </div>`;
+  }).join('');
+}
+
+window.seleccionarBarrioMapeador = function(id) {
+  _barrioSeleccionado = id;
+  const v = _barriosFB[id];
+  if (!v) return;
+
+  // Resaltar
+  document.querySelectorAll('#lista-mapeador > div').forEach(el => el.style.background = 'transparent');
+  const el = document.getElementById('item-' + id);
+  if (el) { el.style.background = '#1a2a3a'; }
+
+  // Info bar
+  const info = document.getElementById('info-mapeador');
+  info.innerHTML = `<b style="color:#FFC300;">${v.nombre}</b> · <span style="color:#aaa;">${v.zona||'?'}</span> · ${v.lat ? `<span style="color:#27ae60;">✅ ${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}</span>` : '<span style="color:#e74c3c;">Sin coords — toca el mapa</span>'}`;
+
+  // Centrar mapa y cerrar panel
+  if (v.lat && v.lng) {
+    _mapModal.setView([v.lat, v.lng], 17);
+    if (_pinTempModal) _mapModal.removeLayer(_pinTempModal);
+    _pinTempModal = L.marker([v.lat, v.lng], { icon: _iconPin('#27ae60') }).addTo(_mapModal)
+      .bindTooltip(`<b>${v.nombre}</b>`, { permanent: false });
+  } else {
+    _mapModal.setView([4.5339, -75.6811], 14);
+    if (_pinTempModal) { _mapModal.removeLayer(_pinTempModal); _pinTempModal = null; }
+  }
+
+  // Cerrar panel para ver el mapa
+  _panelMapeadorAbierto = false;
+  document.getElementById('panel-mapeador').style.transform = 'translateY(calc(100% - 52px))';
+  const arrow = document.getElementById('panel-mapeador-arrow');
+  if (arrow) arrow.textContent = '▲';
+};
+
+function _iconPin(color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="background:${color};width:36px;height:36px;border-radius:50%;border:4px solid white;box-shadow:0 4px 15px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:18px;">📍</div>`,
+    iconSize: [36, 36], iconAnchor: [18, 18]
+  });
+}
+
+function _onMapClick(e) {
+  if (!_barrioSeleccionado) {
+    _toastMapeador('⚠️ Primero abre el panel y selecciona un barrio', '#e67e22'); return;
+  }
+  const lat = parseFloat(e.latlng.lat.toFixed(6));
+  const lng = parseFloat(e.latlng.lng.toFixed(6));
+  const v   = _barriosFB[_barrioSeleccionado];
+  if (!v) return;
+
+  if (_pinTempModal) _mapModal.removeLayer(_pinTempModal);
+  _pinTempModal = L.marker([lat, lng], { icon: _iconPin('#e74c3c') }).addTo(_mapModal);
+
+  _pinTempModal.bindPopup(`
+    <div style="min-width:200px;font-family:sans-serif;">
+      <b style="color:#FFC300;font-size:13px;">${v.nombre}</b><br>
+      <span style="color:#7c8098;font-size:11px;">${lat}, ${lng}</span><br><br>
+      <button onclick="window._guardarCoordsMapeador(${lat},${lng})"
+        style="background:#27ae60;color:#fff;border:none;padding:9px;border-radius:7px;cursor:pointer;font-weight:700;width:100%;font-size:14px;">
+        ✅ Guardar coordenadas
+      </button>
+      <button onclick="window._mapModal.closePopup()"
+        style="background:#2a2d38;color:#aaa;border:none;padding:7px;border-radius:7px;cursor:pointer;font-size:12px;width:100%;margin-top:6px;">
+        ✕ Elegir otro punto
+      </button>
+    </div>`, { maxWidth: 240 }).openPopup();
+}
+
+window._guardarCoordsMapeador = async function(lat, lng) {
+  if (!_barrioSeleccionado || !window.db) return;
+  try {
+    await window.dbUpdate(window.dbRef(window.db, 'barrios/' + _barrioSeleccionado), { lat, lng });
+    _barriosFB[_barrioSeleccionado].lat = lat;
+    _barriosFB[_barrioSeleccionado].lng = lng;
+    _mapModal.closePopup();
+    if (_pinTempModal) { _mapModal.removeLayer(_pinTempModal); _pinTempModal = null; }
+    _toastMapeador(`✅ "${_barriosFB[_barrioSeleccionado].nombre}" guardado`);
+
+    // Pin verde permanente
+    L.marker([lat, lng], { icon: _iconPin('#27ae60') }).addTo(_mapModal)
+      .bindTooltip(`<b>${_barriosFB[_barrioSeleccionado].nombre}</b> ✅`, { permanent: false });
+
+    _renderListaMapeador();
+    _barrioSeleccionado = null;
+    document.getElementById('info-mapeador').innerHTML = '✅ Guardado — abre el panel para seleccionar el siguiente barrio';
+  } catch(e) {
+    _toastMapeador('❌ Error: ' + e.message, '#e74c3c');
+  }
+};
+
+// ── BORRAR TODAS LAS COORDENADAS ─────────────────────
+window._borrarTodasCoords = async function() {
+  event.stopPropagation();
+  const total = Object.values(_barriosFB).filter(v => v.lat).length;
+  if (!total) { _toastMapeador('ℹ️ No hay coordenadas que borrar', '#4A9EFF'); return; }
+  if (!confirm(`¿Borrar las coordenadas de ${total} barrios?\n\nEsto NO borra los barrios, solo sus lat/lng.`)) return;
+
+  _toastMapeador('⏳ Borrando coordenadas...', '#e67e22');
+  let ok = 0;
+  for (const [id, v] of Object.entries(_barriosFB)) {
+    if (!v.lat && !v.lng) continue;
+    try {
+      await window.dbUpdate(window.dbRef(window.db, 'barrios/' + id), { lat: null, lng: null });
+      delete _barriosFB[id].lat;
+      delete _barriosFB[id].lng;
+      ok++;
+    } catch(e) { console.warn('Error borrando', id, e); }
+  }
+  _renderListaMapeador();
+  _toastMapeador(`✅ ${ok} coordenadas borradas`, '#27ae60');
+};
+
+// ── BÚSQUEDA NOMINATIM EN MAPEADOR ───────────────────
+window._buscarEnMapaMapeador = async function() {
+  const q = document.getElementById('buscar-mapeador')?.value.trim();
+  if (!q) return;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+', Armenia, Quindío, Colombia')}&limit=5&countrycodes=co&accept-language=es`;
+    const res = await fetch(url).then(r => r.json());
+    const sug = document.getElementById('sugerencias-mapeador');
+    if (!res || !res.length) { _toastMapeador('⚠️ No encontrado', '#e67e22'); sug.style.display='none'; return; }
+    sug.style.display = 'block';
+    sug.innerHTML = res.map(r => {
+      const partes = r.display_name.split(',');
+      return `<div onclick="window._elegirSugMapeador(${r.lat},${r.lon})"
+        style="padding:9px 12px;border-bottom:1px solid #2a2d38;cursor:pointer;font-size:13px;color:#e8eaf0;"
+        onmouseover="this.style.background='#2a2d38'" onmouseout="this.style.background='transparent'">
+        ${partes[0]}<br><small style="color:#7c8098;">${partes.slice(1,3).join(',').trim()}</small>
+      </div>`;
+    }).join('');
+  } catch(e) { _toastMapeador('⚠️ Error de red', '#e67e22'); }
+};
+
+window._elegirSugMapeador = function(lat, lon) {
+  _mapModal.setView([parseFloat(lat), parseFloat(lon)], 17);
+  document.getElementById('sugerencias-mapeador').style.display = 'none';
+  document.getElementById('buscar-mapeador').value = '';
+};
+
+function _toastMapeador(msg, color) {
+  const t = document.getElementById('toast-mapeador');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.background = color || '#27ae60';
+  t.style.opacity = '1';
+  setTimeout(() => { t.style.opacity = '0'; }, 2800);
+}
+
 window.subirBarriosFirebase = async function() {
   const btn = document.getElementById('btn-subir-barrios');
-  const conf = confirm('¿Subir los 312 barrios a Firebase en /barrios/?\nEsto crea/sobreescribe el nodo /barrios con todos los barrios.');
+  const total = BARRIOS_ADMIN.length;
+  const conCoords = BARRIOS_ADMIN.filter(b => b.lat).length;
+  const conf = confirm(`¿Subir ${total} barrios a Firebase en /barrios/?\n${conCoords} con coordenadas, ${total - conCoords} sin coordenadas.\nEsto sobreescribe /barrios completo.`);
   if (!conf) return;
 
   btn.disabled = true;
   btn.textContent = '⏳ Subiendo...';
 
   try {
-    const _db  = db;
-    const _ref = dbRef;
-    const _set = set;
+    const _db  = window.db;
+    const _ref = window.dbRef;
+    const _set = window.dbSet;
+    if (!_db || !_ref || !_set) throw new Error('Firebase no está listo. Recarga la página.');
     const batch = {};
     BARRIOS_ADMIN.forEach((b, i) => {
       const id = 'c'+b.c+'_'+b.n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'_').slice(0,20)+'_'+i;
@@ -4674,7 +5016,7 @@ window.subirBarriosFirebase = async function() {
     btn.style.background = '#27ae60';
     btn.style.color = '#fff';
     setTimeout(()=>{ btn.textContent='📤 Subir todos a Firebase'; btn.style.background='#FFC300'; btn.style.color='#000'; btn.disabled=false; }, 3000);
-    alert('✅ 312 barrios subidos correctamente a Firebase en /barrios/');
+    alert(`✅ ${total} barrios subidos correctamente a Firebase.\n${conCoords} con coordenadas GPS.`);
   } catch(e) {
     alert('❌ Error: ' + e.message);
     btn.textContent = '📤 Subir todos a Firebase';
@@ -4684,6 +5026,77 @@ window.subirBarriosFirebase = async function() {
 
 
 </script>
+
+<!-- ==================== MODAL MAPEADOR DE COORDENADAS ==================== -->
+<div id="modal-mapeador" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#0e0f13;z-index:9999;flex-direction:column;">
+
+  <!-- HEADER -->
+  <div style="background:#16181f;border-bottom:1px solid #2a2d38;padding:10px 14px;flex-shrink:0;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      <span style="font-size:16px;">🗺️</span>
+      <div style="font-weight:800;color:#FFC300;font-size:15px;">Mapeador de Coordenadas</div>
+      <button onclick="cerrarMapeador()" style="margin-left:auto;background:#333;color:#fff;border:none;padding:5px 11px;border-radius:8px;cursor:pointer;font-size:16px;">✕</button>
+    </div>
+    <div style="font-size:11px;color:#7c8098;">Selecciona barrio en el panel → toca el punto exacto → guarda</div>
+  </div>
+
+  <!-- BARRA: barrio seleccionado + búsqueda -->
+  <div style="background:#16181f;border-bottom:1px solid #2a2d38;padding:8px 12px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;">
+    <div id="info-mapeador" style="font-size:13px;color:#7c8098;padding:6px 10px;background:#1e2029;border-radius:8px;">
+      👆 Abre el panel y selecciona un barrio
+    </div>
+    <div style="display:flex;gap:6px;">
+      <input type="text" id="buscar-mapeador" placeholder="🔍 Buscar en el mapa (Nominatim)..."
+        style="flex:1;background:#1e2029;border:1.5px solid #2a2d38;border-radius:8px;color:#e8eaf0;font-size:13px;padding:8px 10px;outline:none;box-sizing:border-box;"
+        onkeydown="if(event.key==='Enter') _buscarEnMapaMapeador()"/>
+      <button onclick="_buscarEnMapaMapeador()" style="background:#4A9EFF;color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;white-space:nowrap;">🔍 Buscar</button>
+    </div>
+    <div id="sugerencias-mapeador" style="background:#1e2029;border:1px solid #2a2d38;border-radius:8px;overflow:hidden;display:none;"></div>
+  </div>
+
+  <!-- MAPA (ocupa toda la pantalla disponible) -->
+  <div id="mapa-modal" style="flex:1;min-height:0;z-index:1;"></div>
+
+  <!-- PANEL INFERIOR DESLIZABLE -->
+  <div id="panel-mapeador" style="position:absolute;bottom:0;left:0;right:0;background:#16181f;border-top:2px solid #FFC300;border-radius:16px 16px 0 0;z-index:500;max-height:70vh;display:flex;flex-direction:column;transform:translateY(calc(100% - 52px));transition:transform .3s ease;">
+
+    <!-- HANDLE -->
+    <div id="panel-mapeador-handle" onclick="_togglePanelMapeador()" style="padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0;user-select:none;">
+      <div style="width:36px;height:4px;background:#FFC300;border-radius:2px;margin:0 auto;position:absolute;left:50%;transform:translateX(-50%);top:8px;"></div>
+      <span style="font-size:14px;margin-top:4px;">📋</span>
+      <span style="font-weight:700;color:#FFC300;font-size:13px;margin-top:4px;">Barrios</span>
+      <span id="panel-mapeador-count" style="background:#FFC300;color:#000;border-radius:20px;font-size:11px;font-weight:700;padding:1px 8px;"></span>
+      <div style="margin-left:auto;display:flex;gap:6px;margin-top:4px;">
+        <button onclick="event.stopPropagation();_borrarTodasCoords()" style="background:#e74c3c;color:#fff;border:none;padding:5px 10px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:700;">🗑️ Borrar coords</button>
+        <span style="color:#7c8098;font-size:18px;" id="panel-mapeador-arrow">▲</span>
+      </div>
+    </div>
+
+    <!-- FILTROS -->
+    <div style="padding:0 12px 8px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #2a2d38;">
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="filtro-mapeador" placeholder="🔍 Buscar barrio..." oninput="_renderListaMapeador()"
+          style="flex:1;background:#1e2029;border:1.5px solid #2a2d38;border-radius:8px;color:#e8eaf0;font-size:13px;padding:7px 10px;outline:none;box-sizing:border-box;"/>
+        <select id="filtro-zona-mapeador" onchange="_renderListaMapeador()"
+          style="background:#1e2029;border:1.5px solid #2a2d38;border-radius:8px;color:#e8eaf0;font-size:12px;padding:7px 8px;box-sizing:border-box;">
+          <option value="">Todas</option>
+          <option value="sur">🔴 Sur</option>
+          <option value="centro">🟡 Centro</option>
+          <option value="norte">🔵 Norte</option>
+          <option value="oriente">🟠 Oriente</option>
+          <option value="occidente">🟣 Occidente</option>
+        </select>
+      </div>
+      <div id="stats-mapeador" style="font-size:11px;color:#7c8098;"></div>
+    </div>
+
+    <!-- LISTA -->
+    <div id="lista-mapeador" style="overflow-y:auto;flex:1;"></div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast-mapeador" style="position:absolute;top:160px;left:50%;transform:translateX(-50%);background:#27ae60;color:#fff;font-weight:700;font-size:13px;padding:10px 20px;border-radius:30px;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:99999;max-width:90vw;text-align:center;"></div>
+</div>
 
 </body>
 </html>
