@@ -1,13 +1,110 @@
 <!DOCTYPE html>
+<!--
+╔══════════════════════════════════════════════════════════════════════╗
+║         SERVI ALIADOS — PANEL ADMIN                                 ║
+║         ÍNDICE MAESTRO DE SECCIONES                                 ║
+╠══════════════════════════════════════════════════════════════════════╣
+║  BUSCA CADA SECCIÓN CON CTRL+F Y EL CÓDIGO EXACTO                   ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  ▶ CSS ────────────────────────────────────────────────────────      ║
+║    [CSS-01] VARIABLES GLOBALES (:root)                               ║
+║    [CSS-02] MAIN CONTENT WRAPPER                                     ║
+║    [CSS-03] SCROLLBARS                                               ║
+║    [CSS-04] LOGIN OVERLAY                                            ║
+║    [CSS-05] SIDEBAR                                                  ║
+║    [CSS-06] SECCIONES PRINCIPALES                                    ║
+║    [CSS-07] CHAT CONTAINER                                           ║
+║    [CSS-08] LISTAS DE CHAT                                           ║
+║    [CSS-09] CHAT BOX INFO                                            ║
+║    [CSS-10] MENSAJES ÁREA                                            ║
+║    [CSS-11] CHAT FOOTER                                              ║
+║    [CSS-12] REPARTIDORES LAYOUT                                      ║
+║    [CSS-13] MENSAJES                                                 ║
+║    [CSS-14] MAPA                                                     ║
+║    [CSS-15] HISTORIAL                                                ║
+║    [CSS-16] ESTADO BADGES                                            ║
+║    [CSS-17] MODALES                                                  ║
+║    [CSS-18] TIENDAS GRID                                             ║
+║    [CSS-19] APROBACIÓN / WHATSAPP BOTONES                            ║
+║    [CSS-20] SOPORTE CLIENTES                                         ║
+║    [CSS-21] PEDIDO HISTORIAL EXPANDIBLE                              ║
+║    [CSS-22] BARRIOS SECTION                                          ║
+║    [CSS-23] REPARTIDORES LIST                                        ║
+║    [CSS-24] RESPONSIVE                                               ║
+║                                                                      ║
+║  ▶ HTML ───────────────────────────────────────────────────────      ║
+║    [HTML-01] LOGIN OVERLAY                                           ║
+║    [HTML-02] HAMBURGER (mobile)                                      ║
+║    [HTML-03] SIDEBAR NAVIGATION                                      ║
+║    [HTML-04] MAIN CONTENT                                            ║
+║    [HTML-05] SECCIÓN: CHATS                                          ║
+║    [HTML-06] SECCIÓN: REPARTIDORES                                   ║
+║    [HTML-07] SECCIÓN: HISTORIAL                                      ║
+║    [HTML-08] SECCIÓN: MAPA                                           ║
+║    [HTML-09] SECCIÓN: TIENDAS                                        ║
+║    [HTML-10] MODAL: EDITAR PEDIDO                                    ║
+║    [HTML-11] MODAL: AUTENTICACIÓN                                    ║
+║    [HTML-12] AUDIOS DE NOTIFICACIÓN                                  ║
+║    [HTML-13] MODAL: AGREGAR PRODUCTO                                 ║
+║    [HTML-14] SECCIÓN: BARRIOS                                        ║
+║    [HTML-15] SECCIÓN: SOPORTE CLIENTES                               ║
+║    [HTML-16] MODAL: DETALLE PEDIDO HISTORIAL                         ║
+║    [HTML-17] MODAL: EDITAR BARRIO                                    ║
+║    [HTML-18] MODAL MAPEADOR DE COORDENADAS                           ║
+║                                                                      ║
+║  ▶ JS (type="module") ─────────────────────────────────────────      ║
+║    [JS-01] IMPORTS DE FIREBASE                                       ║
+║    [JS-02] CONFIGURACIÓN FIREBASE                                    ║
+║    [JS-03] VARIABLES GLOBALES                                        ║
+║    [JS-04] ELEMENTOS DEL DOM                                         ║
+║    [JS-05] SISTEMA DE LIMPIEZA AUTOMÁTICA DE MENSAJES                ║
+║    [JS-06] FUNCIONES DEL MAPA                                        ║
+║    [JS-07] FUNCIONES DE UTILIDAD                                     ║
+║    [JS-08] AUTENTICACIÓN                                             ║
+║    [JS-09] BOTÓN CERRAR SESIÓN                                       ║
+║    [JS-10] FUNCIONES DE NAVEGACIÓN                                   ║
+║    [JS-11] OBTENER DATOS DE CLIENTE/REPARTIDOR                       ║
+║    [JS-12] ACTUALIZAR HEADER DEL CHAT                                ║
+║    [JS-13] CREAR ITEM DE CHAT                                        ║
+║    [JS-14] LISTENER DE CHATS                                         ║
+║    [JS-15] FUNCIÓN PARA FORZAR CARGA DE CHATS                        ║
+║    [JS-16] ACTUALIZAR DROPDOWN DE CLIENTES                           ║
+║    [JS-17] ABRIR CHAT                                                ║
+║    [JS-18] SUBIR Y ENVIAR ARCHIVOS                                   ║
+║    [JS-19] GRABAR AUDIO                                              ║
+║    [JS-20] ENVIAR MENSAJE                                            ║
+║    [JS-21] EVENT LISTENERS DE CHAT                                   ║
+║    [JS-22] ACTUALIZAR LISTA DE REPARTIDORES                          ║
+║    [JS-23] LISTENER REPARTIDORES INFO + MAPA                         ║
+║    [JS-24] NAVEGACIÓN ENTRE TABS                                     ║
+║    [JS-25] INICIALIZACIÓN AL CARGAR                                  ║
+║    [JS-26] CÓDIGO DE PEDIDOS Y FORMULARIOS                           ║
+║    [JS-27] LISTENERS DE PEDIDOS                                      ║
+║    [JS-28] MOSTRAR HISTORIAL - LISTA DE REPARTIDORES                 ║
+║    [JS-29] MOSTRAR HISTORIAL - POR FECHA                             ║
+║    [JS-30] MOSTRAR DETALLE DE PEDIDOS                                ║
+║    [JS-31] CONFIRMAR ACCIÓN (EDITAR/CANCELAR)                        ║
+║    [JS-32] AUTENTICACIÓN PARA ACCIONES                               ║
+║    [JS-33] ABRIR MODAL DE EDICIÓN                                    ║
+║    [JS-34] CANCELAR PEDIDO                                           ║
+║    [JS-35] GUARDAR EDICIÓN DE PEDIDO                                 ║
+║    [JS-36] REENVIAR PEDIDO                                           ║
+║    [JS-37] CIERRE DEL SCRIPT                                         ║
+║    [JS-38] GESTIÓN DE TIENDAS                                        ║
+║    [JS-39] HISTORIAL DE VENTAS                                       ║
+╚══════════════════════════════════════════════════════════════════════╝
+-->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel Domicilios Admin v2.0 - MULTIMEDIA SINCRONIZADO</title>
-<!-- VERSIÓN CORREGIDA - FECHA: 30 ENE 2026 -->
+<!-- VERSIÓN CORREGIDA - FECHA: 14 ABR 2026 -->
 <!-- ✅ CORRECCIÓN CRÍTICA: Lee imagenUrl y audioUrl del repartidor -->
 <!-- ✅ MEJORA: Compatible con campos del admin (url) y repartidor (imagenUrl/audioUrl) -->
 <!-- ✅ MEJORA: Logs de diagnóstico y manejo de errores -->
+<!-- ✅ FIX JS-14: Listener de chats ahora detecta mensajes nuevos de repartidores (no solo IDs nuevos) -->
 <!-- Leaflet CSS para el mapa -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <!-- 🛠️ ERUDA - Solo activar en desarrollo local, no en producción -->
@@ -27,6 +124,9 @@
 ═══════════════════════════════════════════════════════════ */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-01] VARIABLES GLOBALES (:root)                     │
+   └─────────────────────────────────────────────────────────┘ */
 :root {
   --bg:          #060B17;
   --surface:     #0D1526;
@@ -68,6 +168,9 @@ body {
   display: flex;
 }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-02] MAIN CONTENT WRAPPER                           │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== MAIN CONTENT WRAPPER ==================== */
 #mainContent {
   flex: 1;
@@ -77,12 +180,18 @@ body {
   flex-direction: column;
 }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-03] SCROLLBARS                                     │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== SCROLLBARS ==================== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--surface); }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-04] LOGIN OVERLAY                                  │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== LOGIN OVERLAY ==================== */
 #adminLogin {
   position: fixed;
@@ -189,6 +298,9 @@ body {
 
 #loginError { color: var(--danger) !important; font-size: 13px; text-align: center; margin-top: 8px; }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-05] SIDEBAR                                        │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== SIDEBAR ==================== */
 header {
   position: fixed;
@@ -352,6 +464,9 @@ header {
   border-color: var(--danger);
 }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-06] SECCIONES PRINCIPALES                          │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== SECCIONES PRINCIPALES ==================== */
 section {
   display: none;
@@ -376,6 +491,9 @@ section h2 {
 
 section h2 strong, section h2 span { color: var(--accent); }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-07] CHAT CONTAINER                                 │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== CHAT CONTAINER ==================== */
 .chat-container {
   display: flex;
@@ -408,6 +526,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 #clientes.active-chat .chat-box { display: flex; }
 #clientes.active-chat .chat-sidebar { min-width: 300px; }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-08] LISTAS DE CHAT                                 │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== LISTAS DE CHAT ==================== */
 .chat-list, .historial-list {
   background: var(--surface2);
@@ -473,6 +594,9 @@ section h2 strong, section h2 span { color: var(--accent); }
   display: inline-block;
 }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-09] CHAT BOX INFO                                  │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== CHAT BOX INFO ==================== */
 .chat-box-info {
   font-size: 11px;
@@ -494,6 +618,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 .chat-box-info strong { display: inline-block; min-width: 60px; color: var(--accent); }
 .chat-box-info a { color: var(--blue-h); text-decoration: none; font-weight: 600; }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-10] MENSAJES ÁREA                                  │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== MENSAJES ÁREA ==================== */
 .mensajes-area {
   flex-grow: 1;
@@ -526,6 +653,9 @@ section h2 strong, section h2 span { color: var(--accent); }
   display: none;
 }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-11] CHAT FOOTER                                    │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== CHAT FOOTER ==================== */
 .chat-footer {
   padding-top: 12px;
@@ -645,6 +775,9 @@ section h2 strong, section h2 span { color: var(--accent); }
   display: none;
 }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-12] REPARTIDORES LAYOUT                            │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== REPARTIDORES LAYOUT ==================== */
 .repartidores-layout {
   display: flex;
@@ -791,6 +924,9 @@ section h2 strong, section h2 span { color: var(--accent); }
   transform: translateY(-1px);
 }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-13] MENSAJES                                       │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== MENSAJES ==================== */
 .mensaje {
   padding: 9px 13px 6px 13px;
@@ -866,6 +1002,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 .mensaje-content a { color: var(--blue-h); text-decoration: none; font-weight: 600; display: inline-block; }
 .usuario .mensaje-content a, .repartidor-msg .mensaje-content a { color: var(--blue-h); }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-14] MAPA                                           │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== MAPA ==================== */
 #mapaRepartidores { padding: 0; }
 
@@ -949,6 +1088,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 .leaflet-popup-content strong { color: var(--accent); }
 .leaflet-popup-tip { background: var(--surface2); }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-15] HISTORIAL                                      │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== HISTORIAL ==================== */
 .historial-step-item {
   padding: 13px 14px;
@@ -998,6 +1140,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 
 .detalle-linea span.valor { text-align: right; max-width: 70%; word-wrap: break-word; color: var(--text); }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-16] ESTADO BADGES                                  │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== ESTADO BADGES ==================== */
 .estado-badge {
   position: absolute;
@@ -1062,6 +1207,9 @@ section h2 strong, section h2 span { color: var(--accent); }
   display: block;
 }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-17] MODALES                                        │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== MODALES ==================== */
 .modal-overlay {
   position: fixed;
@@ -1172,6 +1320,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 #actionAuthModal .modal-content { max-width: 360px; }
 #authError { color: var(--danger); margin-top: 10px; text-align: center; font-size: 13px; }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-18] TIENDAS GRID                                   │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== TIENDAS GRID ==================== */
 .tiendas-grid {
   display: grid;
@@ -1313,6 +1464,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 .btn-guardar-producto:hover { box-shadow: 0 0 12px rgba(245,158,11,0.4); }
 .btn-cancelar-producto { background: var(--surface3); color: var(--text-2); }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-19] APROBACIÓN / WHATSAPP BOTONES                  │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== APROBACIÓN / WHATSAPP BOTONES ==================== */
 .btn-aprobar-tienda {
   background: var(--success-dim);
@@ -1362,6 +1516,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 }
 .btn-whatsapp:hover { background: #25D366; color: white; }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-20] SOPORTE CLIENTES                               │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== SOPORTE CLIENTES ==================== */
 .soporte-item {
   padding: 13px;
@@ -1402,6 +1559,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 
 .soporte-msg-time { font-size: 10px; color: var(--text-3); margin-top: 3px; }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-21] PEDIDO HISTORIAL EXPANDIBLE                    │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== PEDIDO HISTORIAL EXPANDIBLE ==================== */
 .pedido-historial-item { cursor: pointer; }
 #modalDetallePedido h4 { color: var(--accent); margin: 14px 0 7px 0; font-size: 14px; font-weight: 700; }
@@ -1409,9 +1569,15 @@ section h2 strong, section h2 span { color: var(--accent); }
 #modalDetallePedido .det-row span:first-child { color: var(--text-3); }
 #modalDetallePedido .det-row span:last-child { color: var(--text); text-align: right; max-width: 65%; }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-22] BARRIOS SECTION                                │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== BARRIOS SECTION ==================== */
 #barriosSection h2 { color: var(--text); }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-23] REPARTIDORES LIST                              │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== REPARTIDORES LIST ==================== */
 .historial-list {
   background: var(--surface2);
@@ -1419,6 +1585,9 @@ section h2 strong, section h2 span { color: var(--accent); }
   border: 1px solid var(--border);
 }
 
+/* ┌─────────────────────────────────────────────────────────┐
+   │ [CSS-24] RESPONSIVE                                     │
+   └─────────────────────────────────────────────────────────┘ */
 /* ==================== RESPONSIVE ==================== */
 
 /* Hamburger button - mobile only */
@@ -1507,7 +1676,13 @@ section h2 strong, section h2 span { color: var(--accent); }
   }
 
   /* Section content gets a top padding so it clears the hamburger btn */
-  section { padding: 16px; padding-top: 60px; }
+  section { padding: 16px 16px 16px 16px; padding-top: 64px; }
+
+  /* Ensure h2 titles are never hidden behind the toggle button */
+  section h2, section > h2:first-child {
+    padding-left: 0;
+    margin-top: 0 !important;
+  }
 
   .chat-container { flex-direction: column; gap: 0; }
 
@@ -1563,6 +1738,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 </style>
 </head>
 <body>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-01] LOGIN OVERLAY                               ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== LOGIN OVERLAY ==================== -->
 <div id="adminLogin">
     <div>
@@ -1575,9 +1753,15 @@ section h2 strong, section h2 span { color: var(--accent); }
         <p id="loginError" style="color: #FFD700; margin-top: 10px; text-align: center;"></p>
     </div>
 </div>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-02] HAMBURGER (mobile)                          ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== HAMBURGER (mobile) ==================== -->
 <button id="sidebarToggle" onclick="toggleSidebar()" title="Menú">☰</button>
 <div id="sidebarOverlay" onclick="closeSidebar()"></div>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-03] SIDEBAR NAVIGATION                          ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== SIDEBAR NAVIGATION ==================== -->
 <header>
   <!-- Brand -->
@@ -1608,8 +1792,14 @@ section h2 strong, section h2 span { color: var(--accent); }
     <button id="logoutBtn" style="display: none;"><span style="font-size:16px;">🚪</span> Cerrar Sesión</button>
   </div>
 </header>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-04] MAIN CONTENT                                ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== MAIN CONTENT ==================== -->
 <div id="mainContent">
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-05] SECCIÓN: CHATS                              ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== SECCIÓN: CHATS ==================== -->
 <section id="clientes" class="active">
   <h2 id="clientesTitle" style="margin-top:0; margin-bottom: 10px;">Chats Activos</h2>
@@ -1638,6 +1828,9 @@ section h2 strong, section h2 span { color: var(--accent); }
     </div>
   </div>
 </section>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-06] SECCIÓN: REPARTIDORES                       ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== SECCIÓN: REPARTIDORES ==================== -->
 <section id="repartidores">
     <h2 style="margin-top:0;">🚶 Repartidores Conectados y Gestión</h2>
@@ -1684,6 +1877,9 @@ section h2 strong, section h2 span { color: var(--accent); }
         </div>
     </div>
 </section>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-07] SECCIÓN: HISTORIAL                          ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== SECCIÓN: HISTORIAL ==================== -->
 <section id="historialPedidos">
   <h2 id="historialPedidosTitle">📚 Historial de Pedidos Asignados</h2>
@@ -1714,6 +1910,9 @@ section h2 strong, section h2 span { color: var(--accent); }
 
   <div class="historial-step-list" id="listaHistorialPedidos">Cargando historial...</div>
 </section>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-08] SECCIÓN: MAPA                               ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== SECCIÓN: MAPA ==================== -->
 <section id="mapaRepartidores">
   <h2 style="margin-top:0;">🗺️ Ubicación en Tiempo Real de Repartidores</h2>
@@ -1738,6 +1937,9 @@ section h2 strong, section h2 span { color: var(--accent); }
       </div>
   </div>
 </section>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-09] SECCIÓN: TIENDAS                            ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== SECCIÓN: TIENDAS ==================== -->
 <section id="tiendas">
   <h2 style="margin-top:0;">🏪 Gestión de Tiendas</h2>
@@ -1749,6 +1951,9 @@ section h2 strong, section h2 span { color: var(--accent); }
     <p>Cargando tiendas...</p>
   </div>
 </section>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-10] MODAL: EDITAR PEDIDO                        ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== MODAL: EDITAR PEDIDO ==================== -->
 <div id="editarPedidoModal" class="modal-overlay">
     <div class="modal-content">
@@ -1773,6 +1978,9 @@ section h2 strong, section h2 span { color: var(--accent); }
         </form>
     </div>
 </div>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-11] MODAL: AUTENTICACIÓN                        ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== MODAL: AUTENTICACIÓN ==================== -->
 <div id="actionAuthModal" class="modal-overlay">
     <div class="modal-content">
@@ -1793,17 +2001,26 @@ section h2 strong, section h2 span { color: var(--accent); }
         </form>
     </div>
 </div>
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-12] AUDIOS DE NOTIFICACIÓN                      ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== AUDIOS DE NOTIFICACIÓN ==================== -->
  <audio id="notificationSoundCliente" src="https://github.com/dt9650329-ops/Chat-administrador-/raw/f67a159f93aed6be1d6f7f02709384111cd84b7e/%E2%9C%A8Monedas%20Cayendo%20__%20Efectos%20De%20Sonidos%20(MP3_160K).mp3" preload="auto"></audio> 
 <audio id="notificationSoundRepartidor" src="https://github.com/dt9650329-ops/Chat-administrador-/raw/f67a159f93aed6be1d6f7f02709384111cd84b7e/%E2%9C%A8Monedas%20Cayendo%20__%20Efectos%20De%20Sonidos%20(MP3_160K).mp3" preload="auto"></audio> 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module">
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-01] IMPORTS DE FIREBASE                             │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== IMPORTS DE FIREBASE ====================
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getDatabase, ref as dbRef, onValue, push, remove, set, get, update, off } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-02] CONFIGURACIÓN FIREBASE                          │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== CONFIGURACIÓN FIREBASE ====================
   const firebaseConfig = {
     apiKey: "AIzaSyAZX7Q5B29Xti4YtV9wXuiREVdkgcclv9U",
@@ -1825,6 +2042,9 @@ section h2 strong, section h2 span { color: var(--accent); }
   window.dbOnValue = onValue;
   const auth = getAuth(app);
   const storage = getStorage(app); 
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-03] VARIABLES GLOBALES                              │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== VARIABLES GLOBALES ====================
   let repartidoresOnline = {}; 
   let clienteActivo = null; 
@@ -1852,6 +2072,9 @@ section h2 strong, section h2 span { color: var(--accent); }
   const MESSAGE_RETENTION_MS = MESSAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
   const MIN_MESSAGES_TO_KEEP = 10;
   let cleanupExecuted = false;
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-04] ELEMENTOS DEL DOM                               │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== ELEMENTOS DEL DOM ====================
   const DOMElements = {
       clientesSection: document.getElementById("clientes"),
@@ -1905,6 +2128,9 @@ section h2 strong, section h2 span { color: var(--accent); }
       authSubmitBtn: document.getElementById('authSubmitBtn'),
       logoutBtn: document.getElementById('logoutBtn'),
   };
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-05] SISTEMA DE LIMPIEZA AUTOMÁTICA DE MENSAJES      │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== 🗑️ SISTEMA DE LIMPIEZA AUTOMÁTICA DE MENSAJES ====================
   async function cleanupOldMessages() {
       if (!auth.currentUser || cleanupExecuted) return;
@@ -1956,6 +2182,9 @@ section h2 strong, section h2 span { color: var(--accent); }
           cleanupExecuted = true; // Marcar como ejecutado para no reintentar
       }
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-06] FUNCIONES DEL MAPA                              │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== FUNCIONES DEL MAPA ====================
   function initMap() {
       if (mapInitialized) return;
@@ -2131,6 +2360,9 @@ section h2 strong, section h2 span { color: var(--accent); }
       console.log('═══════════════════════════════════════════════════════════');
       console.log('');
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-07] FUNCIONES DE UTILIDAD                           │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== FUNCIONES DE UTILIDAD ====================
   function formatTime(ms) {
       const totalSeconds = Math.floor(ms / 1000);
@@ -2211,6 +2443,12 @@ section h2 strong, section h2 span { color: var(--accent); }
     }
     return date.toLocaleString('es-ES', options);
   }
+  // ✅ FIX COMPATIBILIDAD: Detecta si un mensaje es del Admin
+  // Compatible con mensajes nuevos (rol_remitente:"Repartidor") y viejos (remitente:"repartidor")
+  function esMensajeDeAdmin(msg) {
+      return msg.rol_remitente === "Admin" || msg.remitente === "admin";
+  }
+
   function isRepartidorOnline(repInfo) {
       if (!repInfo || repInfo.online !== true) {
           return false;
@@ -2222,6 +2460,9 @@ section h2 strong, section h2 span { color: var(--accent); }
       const currentTime = Date.now();
       return (currentTime - lastSeen) < INACTIVITY_THRESHOLD;
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-08] AUTENTICACIÓN                                   │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== AUTENTICACIÓN ====================
   DOMElements.loginBtn.addEventListener('click', async () => {
       const email = DOMElements.loginEmailInput.value.trim();
@@ -2276,6 +2517,9 @@ section h2 strong, section h2 span { color: var(--accent); }
           DOMElements.logoutBtn.style.display = 'none';
       }
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-09] BOTÓN CERRAR SESIÓN                             │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== BOTÓN CERRAR SESIÓN ====================
   DOMElements.logoutBtn.addEventListener('click', async () => {
       if (confirm('¿Cerrar sesión?')) {
@@ -2287,6 +2531,9 @@ section h2 strong, section h2 span { color: var(--accent); }
           }
       }
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-10] FUNCIONES DE NAVEGACIÓN                         │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== FUNCIONES DE NAVEGACIÓN ====================
   window.volverAlista = function() {
       if (chatListenerRef) {
@@ -2314,6 +2561,9 @@ section h2 strong, section h2 span { color: var(--accent); }
           DOMElements.chatSidebar.style.display = 'block'; 
       }
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-11] OBTENER DATOS DE CLIENTE/REPARTIDOR             │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== OBTENER DATOS DE CLIENTE/REPARTIDOR ====================
   async function getClientData(chatId) {
        const isRepartidor = !chatId.startsWith("cliente_auth_"); 
@@ -2364,6 +2614,9 @@ section h2 strong, section h2 span { color: var(--accent); }
            isRepartidor: isRepartidor
        };
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-12] ACTUALIZAR HEADER DEL CHAT                      │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== ACTUALIZAR HEADER DEL CHAT ====================
   function actualizarChatHeader(chatId, chatData, isRepartidor, nombreMostrar) {
     const telefono = chatData?.telefono_principal || chatData?.tel1 || chatData?.telefono1 || chatData?.telefono || 'Sin registrar';
@@ -2422,6 +2675,9 @@ section h2 strong, section h2 span { color: var(--accent); }
          DOMElements.clientesSection.classList.add('active-chat');
     }
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-13] CREAR ITEM DE CHAT                              │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== CREAR ITEM DE CHAT ====================
   async function createChatItem(chatId, data) {
     const clientResult = await getClientData(chatId);
@@ -2435,7 +2691,7 @@ section h2 strong, section h2 span { color: var(--accent); }
     
     if (lastAdminMsgTimestamp === 0) {
         mensajesArray.forEach(msg => {
-            if (msg.rol_remitente === "Admin") {
+            if (esMensajeDeAdmin(msg)) {
                 lastAdminMsgTimestamp = Math.max(lastAdminMsgTimestamp, msg.timestamp);
             }
         });
@@ -2443,7 +2699,7 @@ section h2 strong, section h2 span { color: var(--accent); }
     }
     
     const unreadCount = mensajesArray.filter(msg => 
-        (msg.rol_remitente !== "Admin") && (msg.timestamp > lastAdminMsgTimestamp)
+        !esMensajeDeAdmin(msg) && (msg.timestamp > lastAdminMsgTimestamp)
     ).length;
     
     if (unreadCount > 0 && clienteActivo !== chatId) {
@@ -2470,12 +2726,15 @@ section h2 strong, section h2 span { color: var(--accent); }
     
     const telefono = clientData.telefono_principal || clientData.telefono || clientData.tel1 || 'Sin teléfono';
     
-    item.innerHTML = `
+  item.innerHTML = `
         <div class="historial-item-container">
             <strong>${nombreMostrar}</strong>
-            <span>📱 ${telefono} • ${tipoChat}</span>
+            <span style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:11px;background:${isRepartidor ? 'rgba(59,130,246,0.2)' : 'rgba(16,185,129,0.2)'};color:${isRepartidor ? 'var(--blue-h)' : 'var(--success)'};border-radius:10px;padding:1px 7px;font-weight:600;">${tipoChat}</span>
+              <span style="font-size:12px;color:var(--text-3);">📱 ${telefono}</span>
+            </span>
         </div>
-        ${badgeHTML}
+        ${unreadCount > 0 ? `<span class="new-messages-badge">${unreadCount}</span>` : ''}
     `;
     
     item.addEventListener("click", () => {
@@ -2484,6 +2743,9 @@ section h2 strong, section h2 span { color: var(--accent); }
     
     return item;
 }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-14] LISTENER DE CHATS                               │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== LISTENER DE CHATS ====================
 onValue(dbRef(db, "chats"), async snapshot => { 
   if (!auth.currentUser) {
@@ -2497,9 +2759,14 @@ onValue(dbRef(db, "chats"), async snapshot => {
   chatListenerActive = true;
   const data = snapshot.val();  // ✅ CORRECCIÓN: Declara 'data' PRIMERO
   console.log('📡 LISTENER EJECUTÁNDOSE - Usuario:', auth.currentUser?.email, '- Datos:', data ? Object.keys(data).length + ' chats' : 'SIN DATOS');
-    const currentChatIds = data ? Object.keys(data).sort().join(',') : '';
-    const lastChatIds = Object.keys(lastProcessedChats).sort().join(',');
-    if (currentChatIds === lastChatIds) {
+    // ✅ FIX: Comparar IDs + cantidad de mensajes por chat para detectar mensajes nuevos de repartidores
+    const buildChatSignature = (d) => {
+        if (!d) return '';
+        return Object.keys(d).sort().map(id => `${id}:${Object.keys(d[id]).length}`).join(',');
+    };
+    const currentSignature = buildChatSignature(data);
+    const lastSignature = buildChatSignature(lastProcessedChats);
+    if (currentSignature === lastSignature) {
         console.log('ℹ️ Sin cambios en chats, omitiendo actualización');
         chatListenerActive = false;
         return;
@@ -2525,8 +2792,8 @@ onValue(dbRef(db, "chats"), async snapshot => {
         const mensajesB = Object.values(data[idB]);
         const lastAdminA = ultimoMensajeLeido[idA] || 0;
         const lastAdminB = ultimoMensajeLeido[idB] || 0;
-        const unreadA = mensajesA.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminA).length;
-        const unreadB = mensajesB.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminB).length;
+        const unreadA = mensajesA.filter(msg => !esMensajeDeAdmin(msg) && msg.timestamp > lastAdminA).length;
+        const unreadB = mensajesB.filter(msg => !esMensajeDeAdmin(msg) && msg.timestamp > lastAdminB).length;
         if (unreadA !== unreadB) {
             return unreadB - unreadA;
         }
@@ -2543,6 +2810,9 @@ onValue(dbRef(db, "chats"), async snapshot => {
     console.log(`✅ Lista actualizada: ${chatIDs.length} chats únicos`);
     chatListenerActive = false;
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-15] FUNCIÓN PARA FORZAR CARGA DE CHATS              │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== FUNCIÓN PARA FORZAR CARGA DE CHATS ====================
   async function forceLoadChats() {
       console.log('🔄 Forzando carga manual de chats...');
@@ -2574,8 +2844,8 @@ onValue(dbRef(db, "chats"), async snapshot => {
               const mensajesB = Object.values(data[idB]);
               const lastAdminA = ultimoMensajeLeido[idA] || 0;
               const lastAdminB = ultimoMensajeLeido[idB] || 0;
-              const unreadA = mensajesA.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminA).length;
-              const unreadB = mensajesB.filter(msg => msg.rol_remitente !== "Admin" && msg.timestamp > lastAdminB).length;
+              const unreadA = mensajesA.filter(msg => !esMensajeDeAdmin(msg) && msg.timestamp > lastAdminA).length;
+              const unreadB = mensajesB.filter(msg => !esMensajeDeAdmin(msg) && msg.timestamp > lastAdminB).length;
               if (unreadA !== unreadB) {
                   return unreadB - unreadA;
               }
@@ -2598,6 +2868,9 @@ onValue(dbRef(db, "chats"), async snapshot => {
           DOMElements.listaChats.innerHTML = "<p style='color: red;'>Error al cargar chats. Verifica las reglas de Firebase.</p>";
       }
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-16] ACTUALIZAR DROPDOWN DE CLIENTES                 │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== ACTUALIZAR DROPDOWN DE CLIENTES ====================
   async function updateClientesDropdown() {
       if (!auth.currentUser) return;
@@ -2632,6 +2905,9 @@ onValue(dbRef(db, "chats"), async snapshot => {
           document.getElementById("pedidoDireccion").value = clientData.direccion_residencia || clientData.direccion || '';
       }
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-17] ABRIR CHAT                                      │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== ABRIR CHAT ====================
   window.abrirChat = async function(chatId, chatData, isRepartidor, preResueltoNombre = null) {
     if (!auth.currentUser) return;
@@ -2686,7 +2962,7 @@ if (msgData.rol_remitente === "Admin" || msgData.remitente === "admin") {
 }
 console.log(`Mensaje: "${msgData.texto?.substring(0, 20)}..." - Tipo: ${tipo} - Rol: ${msgData.rol_remitente} - TipoMensaje: ${msgData.tipo || 'texto'}`);
                 // ✅ DIAGNÓSTICO: Log completo del mensaje si es multimedia
-                if ((msgData.tipo === 'imagen' || msgData.tipo === 'foto' || msgData.tipo === 'audio') && msgData.rol_remitente !== 'Admin') {
+                if ((msgData.tipo === 'imagen' || msgData.tipo === 'foto' || msgData.tipo === 'audio') && !esMensajeDeAdmin(msgData)) {
                     console.log('🔍 MENSAJE MULTIMEDIA DETECTADO:', {
                         tipo: msgData.tipo,
                         rol: msgData.rol_remitente,
@@ -2767,6 +3043,9 @@ if (tipoMensaje === 'imagen' || tipoMensaje === 'foto' || tipoMensaje === 'image
   }
   window.abrirChat = window.abrirChat;
   window.volverAlista = window.volverAlista;
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-18] SUBIR Y ENVIAR ARCHIVOS                         │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== SUBIR Y ENVIAR ARCHIVOS ====================
   async function uploadAndSend(file, tipo) {
       if (!file || !clienteActivo || !auth.currentUser) return;
@@ -2817,6 +3096,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           DOMElements.chatBox.scrollTop = DOMElements.chatBox.scrollHeight;
       }
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-19] GRABAR AUDIO                                    │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== GRABAR AUDIO ====================
   window.toggleGrabarAudio = async function() {
       const btnAudio = DOMElements.audioBtn;
@@ -2860,6 +3142,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           }
       }
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-20] ENVIAR MENSAJE                                  │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== ENVIAR MENSAJE ====================
   function enviarMensajeAdmin(tipo = 'texto') {
     if (!auth.currentUser) return; 
@@ -2877,6 +3162,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
     DOMElements.mensajeInput.value = "";
     DOMElements.chatBox.scrollTop = DOMElements.chatBox.scrollHeight; 
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-21] EVENT LISTENERS DE CHAT                         │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== EVENT LISTENERS DE CHAT ====================
   DOMElements.fotoBtn.addEventListener('click', () => {
       if (!auth.currentUser || !clienteActivo || DOMElements.fotoBtn.disabled) return;
@@ -2922,6 +3210,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
         enviarMensajeAdmin('texto'); 
     }
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-22] ACTUALIZAR LISTA DE REPARTIDORES                │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== ACTUALIZAR LISTA DE REPARTIDORES ====================
   function updateRepartidoresList(data) {
     DOMElements.listaRepartidores.innerHTML = "";
@@ -2953,7 +3244,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
             const mensajesArray = Object.values(allChatsData[id]);
             const lastAdminMsgTimestamp = ultimoMensajeLeido[id] || 0;
             unreadCount = mensajesArray.filter(msg => 
-                (msg.rol_remitente !== "Admin") && (msg.timestamp > lastAdminMsgTimestamp)
+                !esMensajeDeAdmin(msg) && (msg.timestamp > lastAdminMsgTimestamp)
             ).length;
         }
         const messageHint = unreadCount > 0 ? `<span class="message-hint" title="${unreadCount} mensajes sin leer">💬</span>` : '';
@@ -2989,6 +3280,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
         DOMElements.repartidorSelect.options[0].textContent = "No hay repartidores Online";
     }
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-23] LISTENER REPARTIDORES INFO + MAPA               │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== 🗺️ LISTENER DE REPARTIDORES INFO CON ACTUALIZACIÓN AUTOMÁTICA DEL MAPA ====================
   onValue(dbRef(db, "repartidores_info"), snapshot => {
     if (!auth.currentUser) return; 
@@ -3013,6 +3307,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
         console.log('🗺️ Mapa NO inicializado - esperando que usuario abra pestaña de mapa');
     }
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-24] NAVEGACIÓN ENTRE TABS                           │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== NAVEGACIÓN ENTRE TABS ====================
   const tabs = document.querySelectorAll('.tab-btn');
   const sections = document.querySelectorAll('section');
@@ -3074,6 +3371,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
 
     });
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-25] INICIALIZACIÓN AL CARGAR                        │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== INICIALIZACIÓN AL CARGAR ====================
   window.addEventListener('load', function() {
        window.volverAlista();
@@ -3081,6 +3381,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
        console.log(`🗑️ Sistema de limpieza automática activado: mensajes > ${MESSAGE_RETENTION_DAYS} días serán eliminados`);
        console.log('🗺️ Sistema de mapa en tiempo real activado');
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-26] CÓDIGO DE PEDIDOS Y FORMULARIOS                 │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== CÓDIGO DE PEDIDOS Y FORMULARIOS ====================
   DOMElements.formNuevoPedido.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -3153,6 +3456,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           document.getElementById("pedidoMonto").value = monto;
       });
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-27] LISTENERS DE PEDIDOS                            │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== LISTENERS DE PEDIDOS ====================
   onValue(dbRef(db, "pedidos_historial"), snapshot => {
     if (!auth.currentUser) return;
@@ -3287,6 +3593,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           }, 300);
       }
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-28] MOSTRAR HISTORIAL - LISTA DE REPARTIDORES       │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== MOSTRAR HISTORIAL - LISTA DE REPARTIDORES ====================
   window.mostrarListaRepartidoresHistorial = function() {
       DOMElements.listaHistorialPedidos.innerHTML = "";
@@ -3341,6 +3650,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           DOMElements.listaHistorialPedidos.appendChild(item);
       });
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-29] MOSTRAR HISTORIAL - POR FECHA                   │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== MOSTRAR HISTORIAL - POR FECHA ====================
   window.mostrarHistorialPorFecha = function(repartidorId, repData) {
       DOMElements.listaHistorialPedidos.innerHTML = '';
@@ -3390,6 +3702,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           });
       }
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-30] MOSTRAR DETALLE DE PEDIDOS                      │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== MOSTRAR DETALLE DE PEDIDOS ====================
   window.mostrarDetallePedidos = function(repartidorId, repartidorNombre, fecha, pedidosDelDia) {
       DOMElements.listaHistorialPedidos.innerHTML = '';
@@ -3473,6 +3788,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           DOMElements.listaHistorialPedidos.appendChild(item);
       });
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-31] CONFIRMAR ACCIÓN (EDITAR/CANCELAR)              │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== CONFIRMAR ACCIÓN (EDITAR/CANCELAR) ====================
   window.confirmAction = function(actionType, pedidoId) {
        if (!auth.currentUser) return alert("Debes iniciar sesión para realizar esta acción.");
@@ -3486,6 +3804,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
        DOMElements.authPassword.value = '';
        DOMElements.actionAuthModal.style.display = 'flex';
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-32] AUTENTICACIÓN PARA ACCIONES                     │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== AUTENTICACIÓN PARA ACCIONES ====================
   DOMElements.formActionAuth.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -3527,6 +3848,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           DOMElements.authSubmitBtn.disabled = false;
       }
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-33] ABRIR MODAL DE EDICIÓN                          │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== ABRIR MODAL DE EDICIÓN ====================
   window.openEditPedidoModal = function(pedidoObj) {
       if (!auth.currentUser) return;
@@ -3540,6 +3864,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       DOMElements.editOriginalMonto.value = pedidoObj.montoTotal || 0;
       DOMElements.editarPedidoModal.style.display = 'flex';
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-34] CANCELAR PEDIDO                                 │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== CANCELAR PEDIDO ====================
   window.cancelarPedido = async function(pedidoId) {
       if (!auth.currentUser) return alert("Debes iniciar sesión para cancelar pedidos.");
@@ -3568,6 +3895,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           alert("Hubo un error al intentar cancelar el pedido.");
       }
   }
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-35] GUARDAR EDICIÓN DE PEDIDO                       │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== GUARDAR EDICIÓN DE PEDIDO ====================
   DOMElements.formEditarPedido.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -3621,6 +3951,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           alert("Hubo un error al intentar editar el pedido. Detalle: " + error.message);
       }
 });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-36] REENVIAR PEDIDO                                 │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== REENVIAR PEDIDO ====================
  window.reenviarPedido = async (pedidoId) => {
 if (!auth.currentUser) return alert("Debes iniciar sesión para reenviar un pedido.");
@@ -3685,6 +4018,9 @@ return alert("Error: El pedido original no se encontró.");
           alert("Hubo un error al intentar reenviar el pedido.");
       }
   }
+// ┌─────────────────────────────────────────────────────────┐
+// │ [JS-37] CIERRE DEL SCRIPT                               │
+// └─────────────────────────────────────────────────────────┘
 // ==================== CIERRE DEL SCRIPT ====================
   console.log('');
   console.log('========================================================');
@@ -3698,6 +4034,9 @@ return alert("Error: El pedido original no se encontró.");
   console.log('   ✅ Gestión de pedidos y repartidores');
   console.log('========================================================');
 
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-38] GESTIÓN DE TIENDAS                              │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== GESTIÓN DE TIENDAS ====================
   
   window.cargarTiendas = function() {
@@ -3803,6 +4142,9 @@ return alert("Error: El pedido original no se encontró.");
     }
   }
 
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [JS-39] HISTORIAL DE VENTAS                             │
+  // └─────────────────────────────────────────────────────────┘
   // ==================== HISTORIAL DE VENTAS ====================
   window.mostrarHistorialVentas = async function(negocioId, nombreTienda) {
     try {
@@ -4294,7 +4636,10 @@ return alert("Error: El pedido original no se encontró.");
         div.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <span class="s-nombre">👤 ${nombreUsuario}</span>
-            ${noLeidos > 0 ? `<span class="s-badge">${noLeidos}</span>` : ''}
+            <div style="display:flex;align-items:center;gap:6px;">
+              ${noLeidos > 0 ? `<span class="s-badge">${noLeidos}</span>` : ''}
+              <button onclick="event.stopPropagation();eliminarChatSoporte('${userId}','${nombreUsuario.replace(/'/g,"\\'")}');" title="Eliminar chat de soporte" style="background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:3px 7px;font-size:12px;cursor:pointer;line-height:1;">🗑️</button>
+            </div>
           </div>
           <div class="s-preview">${preview}</div>
         `;
@@ -4320,6 +4665,7 @@ return alert("Error: El pedido original no se encontró.");
 
   function abrirSoporteChat(userId, nombre) {
     soporteClienteActivo = userId;
+    window._soporteClienteActivo = userId; // expose for delete button
     document.getElementById('soporteChatTitulo').textContent = '💬 ' + nombre;
     document.getElementById('soporteChatPanel').style.display = 'flex';
     document.getElementById('soporteChatPanel').style.flexDirection = 'column';
@@ -4387,6 +4733,20 @@ return alert("Error: El pedido original no se encontró.");
     document.getElementById('soporteChatPanel').style.display = 'none';
     document.querySelectorAll('.soporte-item').forEach(el => el.classList.remove('activo'));
     if (soporteListenerRef) { off(soporteListenerRef); soporteListenerRef = null; }
+  }
+
+  window.eliminarChatSoporte = async function(userId, nombreUsuario) {
+    if (!auth.currentUser) return;
+    if (!confirm(`¿Eliminar permanentemente el chat de soporte con ${nombreUsuario}?\n\nEsta acción no se puede deshacer.`)) return;
+    try {
+      await remove(dbRef(db, `soporte_cliente/${userId}`));
+      if (soporteClienteActivo === userId) {
+        cerrarSoporteChat();
+      }
+      // El listener global actualizará la lista automáticamente
+    } catch(e) {
+      alert('Error al eliminar el chat: ' + e.message);
+    }
   }
 
   window.enviarRespuestaSoporte = async function() {
@@ -4462,7 +4822,7 @@ return alert("Error: El pedido original no se encontró.");
       <div class="det-row"><span>Barrio:</span><span style="color:#FFC300;font-weight:bold;">${pedido.barrioRecogida||'—'}</span></div>
       <div class="det-row"><span>Comuna:</span><span>${pedido.comunaRecogida||'—'}</span></div>
       <div class="det-row"><span>Zona:</span><span>${pedido.zonaRecogida||'—'}</span></div>
-      <h4 style="color:#28a745;border-bottom:1px solid #444;padding-bottom:5px;">🏠 Punto B – Entrega</h4>
+      <h4 style="color:#28a745;border-bottom:1px solid #444;padding-bottom:5px;">?? Punto B – Entrega</h4>
       <div class="det-row"><span>Nombre:</span><span>${pedido.nombreRecibe||nombre}</span></div>
       <div class="det-row"><span>Dirección:</span><span>${pedido.dirEntrega||'—'}</span></div>
       <div class="det-row"><span>Teléfono:</span><span>${pedido.telRecibe||telefono}</span></div>
@@ -4586,6 +4946,9 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
 
 </script>
 
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-13] MODAL: AGREGAR PRODUCTO                     ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== MODAL: AGREGAR PRODUCTO ==================== -->
 <div id="modalAgregarProducto" class="modal-producto">
   <div class="modal-producto-content">
@@ -4599,6 +4962,9 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
   </div>
 </div>
 
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-14] SECCIÓN: BARRIOS                            ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== SECCIÓN: BARRIOS ==================== -->
 <section id="barriosSection">
   <h2 style="margin-top:0;margin-bottom:12px;">🗺️ Gestión de Barrios y Ubicaciones</h2>
@@ -4800,6 +5166,9 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
   <div id="tabla-barrios-admin" style="background:#222;border-radius:10px;overflow:hidden;max-height:600px;overflow-y:auto;"></div>
 </section>
 
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-15] SECCIÓN: SOPORTE CLIENTES                   ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== SECCIÓN: SOPORTE CLIENTES ==================== -->
 <section id="soporteClientes">
   <h2 style="margin-top:0;margin-bottom:10px;">🆘 Soporte para Pedidos</h2>
@@ -4814,7 +5183,8 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
     <div id="soporteChatPanel" style="flex:2;display:none;flex-direction:column;background:#2C2C2C;padding:15px;border-radius:10px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;border-bottom:1px solid #444;padding-bottom:10px;">
         <button onclick="cerrarSoporteChat()" style="background:none;border:none;color:#FFD700;font-size:22px;cursor:pointer;padding:0;">←</button>
-        <h3 id="soporteChatTitulo" style="margin:0;color:#FFD700;font-size:16px;">Chat de soporte</h3>
+        <h3 id="soporteChatTitulo" style="margin:0;color:#FFD700;font-size:16px;flex:1;">Chat de soporte</h3>
+        <button id="btnEliminarChatSoporte" onclick="eliminarChatSoporte(window._soporteClienteActivo||'', document.getElementById('soporteChatTitulo').textContent.replace('💬 ',''))" title="Eliminar este chat de soporte" style="background:rgba(239,68,68,0.15);color:#EF4444;border:1px solid rgba(239,68,68,0.3);border-radius:7px;padding:6px 10px;font-size:13px;cursor:pointer;font-weight:600;white-space:nowrap;">🗑️ Borrar chat</button>
       </div>
       <div id="soporteMensajesArea" style="flex-grow:1;overflow-y:auto;min-height:350px;max-height:500px;background:#1A1A1A;padding:15px;border-radius:8px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;"></div>
       <div style="display:flex;gap:8px;align-items:center;">
@@ -4825,6 +5195,9 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
   </div>
 </section>
 
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-16] MODAL: DETALLE PEDIDO HISTORIAL             ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== MODAL: DETALLE PEDIDO HISTORIAL ==================== -->
 <div id="modalDetallePedido" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;overflow-y:auto;">
   <div style="background:#2C2C2C;margin:5% auto;padding:25px;border-radius:15px;max-width:480px;width:90%;position:relative;border:1px solid #444;">
@@ -5629,6 +6002,9 @@ window.subirBarriosFirebase = async function() {
 
 </script>
 
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-17] MODAL: EDITAR BARRIO                        ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== MODAL: EDITAR BARRIO ==================== -->
 <div id="modal-editar-barrio" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:9999;align-items:center;justify-content:center;">
   <div style="background:#1e2a3a;border:1px solid #2980b9;border-radius:14px;max-width:460px;width:92%;padding:24px;position:relative;box-shadow:0 8px 40px rgba(0,0,0,0.7);">
@@ -5685,6 +6061,9 @@ window.subirBarriosFirebase = async function() {
   </div>
 </div>
 
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-18] MODAL MAPEADOR DE COORDENADAS               ║
+     ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== MODAL MAPEADOR DE COORDENADAS ==================== -->
 <div id="modal-mapeador" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#0e0f13;z-index:9999;flex-direction:column;">
 
