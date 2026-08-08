@@ -8110,6 +8110,53 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
     let _sueldosFechaActual = _sueldosHoyStr();
     let _sueldosValorBase = 80000;
     let _sueldosOverrides = {}; // uid -> {valor, pagado}
+    let _sueldosInfoTodosActual = {};
+    let _sueldosUidsActual = [];
+    let _sueldosTickerInterval = null;
+    const _sueldosJornadaMs = 8 * 60 * 60 * 1000; // jornada completa: 8 horas
+
+    // Calcula el % de la barra, cuánto lleva ganado y el tiempo extra (después
+    // de las 8h) para una tarjeta. Misma lógica de "Mi Estado de Cuenta" del
+    // repartidor: la barra se llena según horas trabajadas / 8h, y tras
+    // completarla las horas extra se acumulan aparte en la misma tarjeta.
+    function _sueldosCalcularBarra(ms, valorBase) {
+      const normalMs = Math.min(ms, _sueldosJornadaMs);
+      const extraMs = Math.max(0, ms - _sueldosJornadaMs);
+      const pct = _sueldosJornadaMs > 0 ? Math.min(100, (normalMs / _sueldosJornadaMs) * 100) : 0;
+      const ganado = _sueldosJornadaMs > 0 ? (normalMs / _sueldosJornadaMs) * valorBase : 0;
+      const horasTxt = window._fmtConexion ? window._fmtConexion(ms) : Math.round(ms / 3600000) + 'h';
+      const extraTxt = extraMs > 0 ? (window._fmtConexion ? window._fmtConexion(extraMs) : Math.round(extraMs / 60000) + 'min') : '';
+      return { pct, ganado, horasTxt, extraMs, extraTxt };
+    }
+
+    // Refresca solo las barras (sin recargar Firebase) cada 30s mientras se
+    // está viendo el día de hoy, para que se vean "cargando en vivo" igual
+    // que en la app del repartidor.
+    function _sueldosIniciarTicker() {
+      if (_sueldosTickerInterval) clearInterval(_sueldosTickerInterval);
+      if (_sueldosFechaActual !== _sueldosHoyStr()) return;
+      _sueldosTickerInterval = setInterval(() => {
+        const seccionVisible = document.getElementById('sueldosSection');
+        if (!seccionVisible || seccionVisible.style.display === 'none') return;
+        _sueldosUidsActual.forEach(uid => {
+          const info = _sueldosInfoTodosActual[uid];
+          if (!info) return;
+          const ms = window._calcMs ? window._calcMs(info) : 0;
+          const barra = _sueldosCalcularBarra(ms, _sueldosValorBase);
+          const elBarra = document.getElementById('sueldoBarra-' + uid);
+          const elHoras = document.getElementById('sueldoHoras-' + uid);
+          const elGanado = document.getElementById('sueldoGanado-' + uid);
+          const elExtra = document.getElementById('sueldoExtra-' + uid);
+          if (elBarra) { elBarra.style.width = barra.pct + '%'; elBarra.style.background = barra.extraMs > 0 ? '#f59e0b' : '#10b981'; }
+          if (elHoras) elHoras.textContent = '⏱️ ' + barra.horasTxt;
+          if (elGanado) elGanado.textContent = _sueldosFmtCOP(barra.ganado);
+          if (elExtra) {
+            if (barra.extraMs > 0) { elExtra.style.display = ''; elExtra.textContent = '⏰ Hora extra: ' + barra.extraTxt; }
+            else elExtra.style.display = 'none';
+          }
+        });
+      }, 30000);
+    }
 
     function _sueldosParseCOP(raw) {
       if (!raw && raw !== 0) return 0;
@@ -8187,10 +8234,8 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
     };
 
     window._sueldosGuardarFila = async function(uid) {
-      const inputValor = document.getElementById('sueldoValor-' + uid);
       const inputPagado = document.getElementById('sueldoPagado-' + uid);
-      if (!inputValor) return;
-      const valor = _sueldosParseCOP(inputValor.value);
+      const valor = _sueldosValorBase;
       const pagado = inputPagado ? inputPagado.checked : false;
       try {
         await update(dbRef(db, `sueldos/${_sueldosFechaActual}/${uid}`), {
@@ -8215,10 +8260,8 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
       const updates = {};
       filas.forEach(fila => {
         const uid = fila.dataset.sueldoUid;
-        const inputValor = document.getElementById('sueldoValor-' + uid);
         const inputPagado = document.getElementById('sueldoPagado-' + uid);
-        if (!inputValor) return;
-        updates[`sueldos/${_sueldosFechaActual}/${uid}/valor`] = _sueldosParseCOP(inputValor.value);
+        updates[`sueldos/${_sueldosFechaActual}/${uid}/valor`] = _sueldosValorBase;
         updates[`sueldos/${_sueldosFechaActual}/${uid}/pagado`] = inputPagado ? inputPagado.checked : false;
         updates[`sueldos/${_sueldosFechaActual}/${uid}/actualizadoPor`] = email;
         updates[`sueldos/${_sueldosFechaActual}/${uid}/actualizadoEn`] = ahora;
@@ -8236,9 +8279,8 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
       let totalPagar = 0, totalRecaudo = 0, pagados = 0, pendientes = 0;
       document.querySelectorAll('[data-sueldo-uid]').forEach(fila => {
         const uid = fila.dataset.sueldoUid;
-        const inputValor = document.getElementById('sueldoValor-' + uid);
         const inputPagado = document.getElementById('sueldoPagado-' + uid);
-        totalPagar += _sueldosParseCOP(inputValor ? inputValor.value : 0);
+        totalPagar += parseFloat(fila.dataset.valor || '0');
         totalRecaudo += parseFloat(fila.dataset.recaudo || '0');
         if (inputPagado && inputPagado.checked) pagados++; else pendientes++;
       });
@@ -8280,30 +8322,41 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
           return;
         }
 
+        _sueldosInfoTodosActual = infoTodos;
+        _sueldosUidsActual = uids;
+
         cont.innerHTML = uids.map(uid => {
           const info = infoTodos[uid] || {};
           const nombre = info.nombre || 'Sin nombre';
           const override = _sueldosOverrides[uid] || {};
-          const valorSueldo = (override.valor !== undefined && override.valor !== null) ? override.valor : _sueldosValorBase;
           const pagado = override.pagado === true;
           const recaudo = recaudoMap[uid] || 0;
           const ms = horasMap[uid] || 0;
-          const horasTxt = window._fmtConexion ? window._fmtConexion(ms) : Math.round(ms / 3600000) + 'h';
           const online = info.online === true;
-          return `<div data-sueldo-uid="${uid}" data-recaudo="${recaudo}" style="background:var(--surface2);border:1px solid ${pagado ? 'rgba(16,185,129,0.4)' : 'var(--border)'};border-radius:10px;padding:14px;margin-bottom:10px;">
+          const barra = _sueldosCalcularBarra(ms, _sueldosValorBase);
+          return `<div data-sueldo-uid="${uid}" data-recaudo="${recaudo}" data-valor="${_sueldosValorBase}" style="background:var(--surface2);border:1px solid ${pagado ? 'rgba(16,185,129,0.4)' : 'var(--border)'};border-radius:10px;padding:14px;margin-bottom:10px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
               <div style="font-weight:700;color:var(--text);font-size:14px;">${online ? '🟢' : '⚫'} ${nombre}</div>
               <span id="sueldoInfo-${uid}" style="color:#10b981;font-size:12px;font-weight:700;"></span>
             </div>
             <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-3);margin-bottom:10px;">
-              <div>⏱️ Trabajó: <strong style="color:var(--text-2);">${horasTxt}</strong></div>
               <div>💵 Recaudó en domicilios: <strong style="color:var(--text-2);">${_sueldosFmtCOP(recaudo)}</strong> <span style="opacity:.7;">(a entregar)</span></div>
             </div>
+
+            <div style="margin-bottom:6px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-bottom:4px;">
+                <span id="sueldoHoras-${uid}">⏱️ ${barra.horasTxt}</span>
+                <span id="sueldoGanado-${uid}" style="font-weight:700;color:#10b981;">${_sueldosFmtCOP(barra.ganado)}</span>
+              </div>
+              <div style="background:var(--surface3);border-radius:20px;height:14px;overflow:hidden;">
+                <div id="sueldoBarra-${uid}" style="height:100%;border-radius:20px;background:${barra.extraMs > 0 ? '#f59e0b' : '#10b981'};width:${barra.pct}%;transition:width .4s ease;"></div>
+              </div>
+              <div id="sueldoExtra-${uid}" style="font-size:11px;color:#f59e0b;font-weight:700;margin-top:4px;${barra.extraMs > 0 ? '' : 'display:none;'}">
+                ⏰ Hora extra: ${barra.extraTxt}
+              </div>
+            </div>
+
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-              <label style="color:var(--text-3);font-size:12px;">Sueldo del día:</label>
-              <input id="sueldoValor-${uid}" type="number" min="0" step="1000" value="${valorSueldo}"
-                onchange="window._sueldosActualizarResumen && window._sueldosActualizarResumen()"
-                style="background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);width:120px;font-size:13px;">
               <label style="display:flex;align-items:center;gap:5px;color:var(--text-3);font-size:12px;cursor:pointer;">
                 <input id="sueldoPagado-${uid}" type="checkbox" ${pagado ? 'checked' : ''}
                   onchange="window._sueldosActualizarResumen && window._sueldosActualizarResumen()" style="width:16px;height:16px;">
@@ -8315,6 +8368,7 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
         }).join('');
 
         _sueldosActualizarResumen();
+        _sueldosIniciarTicker();
       } catch (e) {
         console.error('❌ Error cargando sueldos:', e);
         cont.innerHTML = '<p style="color:#e74c3c;text-align:center;padding:20px;">Error al cargar. Intenta de nuevo.</p>';
@@ -8670,7 +8724,7 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
       <span id="sueldosValorBaseInfo" style="color:#10b981;font-size:12px;font-weight:700;"></span>
     </div>
     <div style="color:var(--text-3);font-size:11px;margin-top:8px;">
-      Puedes cambiar el sueldo de un repartidor puntualmente para un día específico (abajo), sin afectar el valor base de los demás.
+      Este valor aplica igual para todos los repartidores. En cada tarjeta se ve en vivo cuánto va ganando y, después de las 8 horas, las horas extra que va sumando.
     </div>
   </div>
 
