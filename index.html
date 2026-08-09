@@ -2113,6 +2113,7 @@ section h2 strong, section h2 span { color: var(--accent); }
   <div class="sidebar-nav header-content-wrapper">
     <button class="tab-btn active" data-tab="clientes"><span class="tab-icon">💬</span> Chats</button>
     <button class="tab-btn" data-tab="repartidores"><span class="tab-icon">🛵</span> Repartidores <span id="badge-repartidores" style="display:none;background:#ef4444;color:#fff;border-radius:20px;padding:2px 7px;font-size:11px;margin-left:auto;font-weight:700;min-width:18px;text-align:center;">0</span></button>
+    <button class="tab-btn" data-tab="pedidosEnVivoSection"><span class="tab-icon">🍕</span> Pedidos en vivo <span id="badge-piv-activos" style="display:none;background:#f59e0b;color:#0A0E1A;border-radius:20px;padding:2px 7px;font-size:11px;margin-left:auto;font-weight:700;min-width:18px;text-align:center;">0</span></button>
     <button class="tab-btn" data-tab="historialPedidos"><span class="tab-icon">📚</span> Historial</button>
     <button class="tab-btn" data-tab="mapaRepartidores"><span class="tab-icon">🗺️</span> Mapa</button>
     <button class="tab-btn" data-tab="tiendas"><span class="tab-icon">🏪</span> Tiendas</button>
@@ -4733,6 +4734,110 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           if (backBtn) setTimeout(() => backBtn.click(), 400);
       }
   });
+  // ┌─────────────────────────────────────────────────────────┐
+  // │ [PIV] PEDIDOS EN VIVO — Monitoreo de solo lectura       │
+  // │ Corre siempre en segundo plano (no solo con la pestaña  │
+  // │ abierta). Al llegar a "Entregado" la tarjeta se queda   │
+  // │ 1 minuto en verde y luego se quita sola de esta vista   │
+  // │ (no borra el pedido real de Firebase ni del historial). │
+  // └─────────────────────────────────────────────────────────┘
+  (function() {
+    const PIV_COLOR = {
+      'pendiente':  { border: '#F59E0B', bg: 'rgba(245,158,11,0.10)',  label: 'Pendiente' },
+      'aceptado':   { border: '#3B82F6', bg: 'rgba(59,130,246,0.10)',  label: 'Esperando en el local' },
+      'esperando':  { border: '#3B82F6', bg: 'rgba(59,130,246,0.10)', label: 'Esperando en el local' },
+      'en-camino':  { border: '#8B5CF6', bg: 'rgba(139,92,246,0.10)',  label: 'En camino' },
+      'completado': { border: '#10B981', bg: 'rgba(16,185,129,0.10)', label: 'Entregado' }
+    };
+    const pivCache = {};   // pedidoId -> datos del pedido
+    const pivTimers = {};  // pedidoId -> handle de setTimeout para quitarlo tras "Entregado"
+
+    function pivHace(ts) {
+      if (!ts) return '';
+      const mins = Math.floor((Date.now() - ts) / 60000);
+      if (mins < 1) return 'hace instantes';
+      if (mins === 1) return 'hace 1 min';
+      if (mins < 60) return `hace ${mins} min`;
+      return `hace ${Math.floor(mins / 60)} h ${mins % 60} min`;
+    }
+
+    function pivProgramarSalida(pedidoId) {
+      if (pivTimers[pedidoId]) return; // ya programado, no duplicar
+      pivTimers[pedidoId] = setTimeout(() => {
+        delete pivCache[pedidoId];
+        delete pivTimers[pedidoId];
+        pivRender();
+      }, 60000); // 1 minuto
+    }
+
+    function pivRender() {
+      const cont = document.getElementById('piv-lista');
+      if (!cont) return;
+      const items = Object.keys(pivCache).map(id => ({ id, ...pivCache[id] }));
+      items.sort((a, b) => (a.timestampCreacion || 0) - (b.timestampCreacion || 0)); // el más viejo sin atender, arriba
+
+      const totalOnline = Object.values(window._repartidoresInfoHistorial || {}).filter(r => r && r.online === true).length;
+      const sinRepartidor = items.filter(p => !p.repartidorIdAsignado).length;
+      const elCon = document.getElementById('piv-conectados');
+      const elAct = document.getElementById('piv-activos');
+      const elSin = document.getElementById('piv-sin-repartidor');
+      if (elCon) elCon.textContent = totalOnline;
+      if (elAct) elAct.textContent = items.length;
+      if (elSin) elSin.textContent = sinRepartidor;
+      const badgePiv = document.getElementById('badge-piv-activos');
+      if (badgePiv) {
+        if (items.length > 0) { badgePiv.textContent = items.length > 99 ? '99+' : items.length; badgePiv.style.display = 'inline-block'; }
+        else { badgePiv.style.display = 'none'; }
+      }
+
+      if (items.length === 0) {
+        cont.innerHTML = '<p style="color:var(--text-3);text-align:center;padding:30px;">No hay pedidos activos en este momento.</p>';
+        return;
+      }
+
+      cont.innerHTML = items.map(p => {
+        const estadoClass = normalizeEstadoClass(p.estado);
+        const colores = PIV_COLOR[estadoClass] || PIV_COLOR['pendiente'];
+        const sinRep = !p.repartidorIdAsignado;
+        const nombreCliente = p.nombreCliente || 'Sin nombre';
+        const direccion = p.direccionCliente || 'Sin dirección';
+        const repTexto = sinRep ? '⚠️ Sin repartidor asignado' : `🛵 ${p.repartidorNombre || 'Repartidor asignado'}`;
+        return `
+          <div style="background:${colores.bg};border:1px solid ${colores.border};border-left:5px solid ${sinRep ? '#F97316' : colores.border};border-radius:10px;padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+              <strong style="color:var(--text-1);font-size:14px;">${nombreCliente}</strong>
+              <span style="background:${colores.border};color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">${colores.label}</span>
+            </div>
+            <div style="color:var(--text-2);font-size:13px;margin-top:4px;">📍 ${direccion}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:6px;">
+              <span style="color:${sinRep ? '#F97316' : 'var(--text-3)'};font-size:12px;font-weight:${sinRep ? '700' : '400'};">${repTexto}</span>
+              <span style="color:var(--text-3);font-size:11px;">🕐 ${pivHace(p.timestampCreacion)}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    onValue(dbRef(db, 'pedidos_pendientes'), (snapshot) => {
+      const data = snapshot.val() || {};
+      Object.keys(data).forEach(id => {
+        const pedido = data[id];
+        pivCache[id] = { ...pedido };
+        if (normalizeEstadoClass(pedido.estado) === 'completado') {
+          pivProgramarSalida(id);
+        }
+      });
+      // Si un pedido ya no está en Firebase y no tiene el temporizador de "Entregado" corriendo
+      // (por ejemplo, se canceló), se quita de inmediato de este tablero.
+      Object.keys(pivCache).forEach(id => {
+        if (!data[id] && !pivTimers[id]) {
+          delete pivCache[id];
+        }
+      });
+      pivRender();
+    });
+
+    setInterval(pivRender, 30000); // refresca los "hace X min" aunque no cambie nada en Firebase
+  })();
   // ┌─────────────────────────────────────────────────────────┐
   // │ [JS-28] MOSTRAR HISTORIAL - LISTA DE REPARTIDORES       │
   // └─────────────────────────────────────────────────────────┘
@@ -8675,6 +8780,43 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
 
   <div style="color:#666;font-size:12px;">
     Nota: este resumen suma en tiempo real los cupones/créditos entregados por ruleta (<code>bonosOtorgados</code>) y los cupones que otorgas manualmente desde el chat de cada cliente (<code>premios.bonosAcum</code>). El total del fondo es el único número que tú controlas manualmente. "Reciclar" NO reactiva cupones ya gastados (siguen bloqueados para el cliente); solo le devuelve ese monto a "Disponibles" para que puedas seguir repartiendo sin subir el total.
+  </div>
+</section>
+
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-PIV] SECCIÓN: PEDIDOS EN VIVO (solo lectura)     ║
+     ╚═══════════════════════════════════════════════════════╝ -->
+<!-- ==================== SECCIÓN: PEDIDOS EN VIVO ==================== -->
+<section id="pedidosEnVivoSection">
+  <h2 style="margin-top:0;margin-bottom:4px;">🍕 Pedidos en Vivo</h2>
+  <p style="color:var(--text-3);font-size:13px;margin:0 0 16px;">Monitoreo en tiempo real de todos los pedidos activos. Solo lectura — no se puede actuar desde aquí. Se actualiza sola, sin botón.</p>
+
+  <div id="piv-resumen" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+    <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:12px 18px;min-width:120px;">
+      <div style="color:var(--text-3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">🟢 Conectados</div>
+      <div id="piv-conectados" style="color:#10b981;font-size:22px;font-weight:700;">0</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 18px;min-width:120px;">
+      <div style="color:var(--text-3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">📦 Activos</div>
+      <div id="piv-activos" style="color:var(--text-1);font-size:22px;font-weight:700;">0</div>
+    </div>
+    <div style="background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:12px 18px;min-width:120px;">
+      <div style="color:var(--text-3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">⚠️ Sin repartidor</div>
+      <div id="piv-sin-repartidor" style="color:#F97316;font-size:22px;font-weight:700;">0</div>
+    </div>
+  </div>
+
+  <!-- Leyenda de colores -->
+  <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;color:var(--text-3);">
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#F59E0B;margin-right:4px;"></span>Pendiente</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3B82F6;margin-right:4px;"></span>Esperando en el local</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#8B5CF6;margin-right:4px;"></span>En camino</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10B981;margin-right:4px;"></span>Entregado</span>
+  </div>
+
+  <!-- Lista de tarjetas -->
+  <div id="piv-lista" style="display:flex;flex-direction:column;gap:10px;max-width:680px;">
+    <p style="color:var(--text-3);text-align:center;padding:30px;">No hay pedidos activos en este momento.</p>
   </div>
 </section>
 
