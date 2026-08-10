@@ -8471,12 +8471,11 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
       const countLocal = document.getElementById('tarifa-count-local');
       const countNatural = document.getElementById('tarifa-count-natural');
       if (statusEl) statusEl.textContent = '';
+
+      // 1) Cargar la tabla de tarifas — esto es lo importante, así que va
+      //    en su propio try/catch y NO debe fallar por el conteo de abajo.
       try {
-        const [snapConfig, snapLocal, snapNatural] = await Promise.all([
-          get(dbRef(db, 'config_tarifas/armenia')),
-          get(dbRef(db, 'clientesLocal')),
-          get(dbRef(db, 'clientesNatural'))
-        ]);
+        const snapConfig = await get(dbRef(db, 'config_tarifas/armenia'));
         const config = snapConfig.exists() ? snapConfig.val() : TARIFAS_ARMENIA_DEFAULT_ADMIN;
         ['local', 'natural'].forEach(tipo => {
           const cfg = config[tipo] || TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo];
@@ -8488,11 +8487,38 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
           if (inputPorKm) inputPorKm.value = cfg.masAllaPorKm ?? TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].masAllaPorKm;
           if (inputKmMax) inputKmMax.value = cfg.kmMaximoAutomatico ?? TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].kmMaximoAutomatico;
         });
-        if (countLocal) countLocal.textContent = snapLocal.exists() ? Object.keys(snapLocal.val()).length : 0;
-        if (countNatural) countNatural.textContent = snapNatural.exists() ? Object.keys(snapNatural.val()).length : 0;
       } catch (e) {
+        // FIX 2026-08-10: antes este catch cubría también el conteo de
+        // clientesLocal/clientesNatural (nodos que no existen), así que
+        // cualquier error ahí tumbaba TODA la carga, incluida la tabla de
+        // precios — y el mensaje no decía el motivo real. Ahora sí se ve.
         console.error('Error al cargar tarifas de cliente:', e);
-        if (statusEl) { statusEl.style.color = '#EF4444'; statusEl.textContent = 'Error al cargar'; }
+        if (statusEl) { statusEl.style.color = '#EF4444'; statusEl.textContent = 'Error al cargar tarifas: ' + e.message; }
+        return;
+      }
+
+      // 2) Contar clientes por tipo — esto es solo informativo (no bloquea
+      //    la edición de precios si falla). El tipo de cliente real vive en
+      //    usuarios/{uid}/tipoCliente ('local' | 'natural'), NO en los nodos
+      //    "clientesLocal"/"clientesNatural" que ya no existen. Se usa el
+      //    nodo "usuarios" (no "users") porque es el que sí tiene ".read"
+      //    abierto para cualquier admin autenticado en las reglas de Firebase,
+      //    y es donde el cliente guarda tipoCliente como fuente principal.
+      try {
+        const snapUsuarios = await get(dbRef(db, 'usuarios'));
+        let nLocal = 0, nNatural = 0;
+        if (snapUsuarios.exists()) {
+          snapUsuarios.forEach(childSnap => {
+            const tipo = childSnap.val()?.tipoCliente;
+            if (tipo === 'local') nLocal++; else nNatural++;
+          });
+        }
+        if (countLocal) countLocal.textContent = nLocal;
+        if (countNatural) countNatural.textContent = nNatural;
+      } catch (e) {
+        console.warn('No se pudo contar clientes por tipo:', e);
+        if (countLocal) countLocal.textContent = '–';
+        if (countNatural) countNatural.textContent = '–';
       }
     };
 
