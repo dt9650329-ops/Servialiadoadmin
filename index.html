@@ -2120,6 +2120,7 @@ section h2 strong, section h2 span { color: var(--accent); }
     <button class="tab-btn" data-tab="soporteClientes" id="tabSoporte"><span class="tab-icon">🆘</span> Soporte <span id="soporte-badge" style="display:none;background:#ff4444;color:#fff;border-radius:50%;padding:2px 7px;font-size:11px;margin-left:auto;font-weight:bold;">0</span></button>
     <button class="tab-btn" data-tab="barriosSection"><span class="tab-icon">📍</span> Barrios <span id="badge-sugerencias" style="display:none;background:#e67e22;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:auto;font-weight:bold;"></span></button>
     <button class="tab-btn" data-tab="fondoCreditosSection"><span class="tab-icon">💰</span> Fondo de Créditos</button>
+    <button class="tab-btn" data-tab="tarifasClienteSection"><span class="tab-icon">🏷️</span> Tarifas Preferenciales</button>
     <button class="tab-btn" data-tab="conexionesSection"><span class="tab-icon">🔌</span> Conexiones <span id="badge-conexiones-online" style="display:none;background:#10b981;color:#fff;border-radius:20px;padding:2px 7px;font-size:11px;margin-left:auto;font-weight:700;min-width:18px;text-align:center;">0</span></button>
     <button class="tab-btn" data-tab="sueldosSection"><span class="tab-icon">💵</span> Sueldos</button>
     <button class="tab-btn" data-tab="activarClientesSection"><span class="tab-icon">✅</span> Activar Clientes <span id="badge-clientes-pendientes" style="display:none;background:#3b82f6;color:#fff;border-radius:20px;padding:2px 7px;font-size:11px;margin-left:auto;font-weight:700;min-width:18px;text-align:center;">0</span></button>
@@ -4299,6 +4300,9 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       }
       if (targetTab === 'sueldosSection' && window._cargarSueldos) {
           window._cargarSueldos();
+      }
+      if (targetTab === 'tarifasClienteSection' && window._cargarTarifasCliente) {
+          window._cargarTarifasCliente();
       }
       if (targetTab !== 'clientes') {
           window.volverAlista(); 
@@ -8405,6 +8409,114 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
       if (elPendientes) elPendientes.textContent = pendientes;
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // 🏷️ MÓDULO: TARIFAS DE COBRO POR TIPO DE CLIENTE
+    // Firebase: config_tarifas/armenia/{local|natural} = { tramos:[{hastaKm,precio}], masAllaBase, masAllaPorKm, kmMaximoAutomatico }
+    // Este es el MISMO nodo que ya leen en vivo el cliente (index.html) y
+    // las Cloud Functions (ServiBot), así que cualquier cambio guardado aquí
+    // se refleja de inmediato en lo que se le cobra al cliente.
+    // clientesLocal/{uid} y clientesNatural/{uid} — se escriben al registrarse
+    // ══════════════════════════════════════════════════════════════
+    const TARIFAS_ARMENIA_DEFAULT_ADMIN = {
+      local: {
+        tramos: [
+          { hastaKm: 1.0, precio: 4000 }, { hastaKm: 3.1, precio: 5000 },
+          { hastaKm: 5.9, precio: 6000 }, { hastaKm: 7.5, precio: 7000 },
+          { hastaKm: 9.0, precio: 8000 }, { hastaKm: 10.5, precio: 9000 },
+        ],
+        masAllaBase: 10000, masAllaPorKm: 1000, kmMaximoAutomatico: 30,
+      },
+      natural: {
+        tramos: [
+          { hastaKm: 1.0, precio: 4000 }, { hastaKm: 3.1, precio: 5000 },
+          { hastaKm: 5.9, precio: 6000 }, { hastaKm: 7.5, precio: 7000 },
+          { hastaKm: 9.0, precio: 8000 }, { hastaKm: 10.5, precio: 9000 },
+        ],
+        masAllaBase: 10000, masAllaPorKm: 1000, kmMaximoAutomatico: 30,
+      },
+    };
+
+    function _pintarTramosTarifa(tipo, tramos) {
+      const cont = document.getElementById(`tarifa-tramos-${tipo}`);
+      if (!cont) return;
+      cont.innerHTML = tramos.map((t, i) => `
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+          <span style="font-size:12px;color:#999;min-width:56px;">Hasta</span>
+          <input type="number" step="0.1" min="0" data-tipo="${tipo}" data-idx="${i}" data-campo="hastaKm" value="${t.hastaKm}"
+            style="width:70px;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
+          <span style="font-size:12px;color:#999;">km →</span>
+          <span style="font-size:13px;color:#ccc;">$</span>
+          <input type="number" step="100" min="0" data-tipo="${tipo}" data-idx="${i}" data-campo="precio" value="${t.precio}"
+            style="width:100px;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
+        </div>
+      `).join('');
+    }
+
+    function _leerTramosTarifa(tipo) {
+      const cont = document.getElementById(`tarifa-tramos-${tipo}`);
+      if (!cont) return [];
+      const filas = [...cont.querySelectorAll('input[data-campo="hastaKm"]')];
+      return filas.map(inputKm => {
+        const idx = inputKm.dataset.idx;
+        const inputPrecio = cont.querySelector(`input[data-campo="precio"][data-idx="${idx}"]`);
+        return {
+          hastaKm: parseFloat(inputKm.value) || 0,
+          precio: Math.round(parseFloat(inputPrecio?.value) || 0)
+        };
+      }).sort((a, b) => a.hastaKm - b.hastaKm);
+    }
+
+    window._cargarTarifasCliente = async function() {
+      const statusEl = document.getElementById('tarifas-cliente-status');
+      const countLocal = document.getElementById('tarifa-count-local');
+      const countNatural = document.getElementById('tarifa-count-natural');
+      if (statusEl) statusEl.textContent = '';
+      try {
+        const [snapConfig, snapLocal, snapNatural] = await Promise.all([
+          get(dbRef(db, 'config_tarifas/armenia')),
+          get(dbRef(db, 'clientesLocal')),
+          get(dbRef(db, 'clientesNatural'))
+        ]);
+        const config = snapConfig.exists() ? snapConfig.val() : TARIFAS_ARMENIA_DEFAULT_ADMIN;
+        ['local', 'natural'].forEach(tipo => {
+          const cfg = config[tipo] || TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo];
+          _pintarTramosTarifa(tipo, cfg.tramos || TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].tramos);
+          const inputBase = document.getElementById(`tarifa-masalla-base-${tipo}`);
+          const inputPorKm = document.getElementById(`tarifa-masalla-porkm-${tipo}`);
+          const inputKmMax = document.getElementById(`tarifa-kmmax-${tipo}`);
+          if (inputBase) inputBase.value = cfg.masAllaBase ?? TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].masAllaBase;
+          if (inputPorKm) inputPorKm.value = cfg.masAllaPorKm ?? TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].masAllaPorKm;
+          if (inputKmMax) inputKmMax.value = cfg.kmMaximoAutomatico ?? TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].kmMaximoAutomatico;
+        });
+        if (countLocal) countLocal.textContent = snapLocal.exists() ? Object.keys(snapLocal.val()).length : 0;
+        if (countNatural) countNatural.textContent = snapNatural.exists() ? Object.keys(snapNatural.val()).length : 0;
+      } catch (e) {
+        console.error('Error al cargar tarifas de cliente:', e);
+        if (statusEl) { statusEl.style.color = '#EF4444'; statusEl.textContent = 'Error al cargar'; }
+      }
+    };
+
+    window._guardarTarifasCliente = async function() {
+      const statusEl = document.getElementById('tarifas-cliente-status');
+      if (statusEl) { statusEl.style.color = '#10B981'; statusEl.textContent = 'Guardando...'; }
+      try {
+        const nuevaConfig = {};
+        for (const tipo of ['local', 'natural']) {
+          const tramos = _leerTramosTarifa(tipo);
+          const masAllaBase = Math.round(parseFloat(document.getElementById(`tarifa-masalla-base-${tipo}`)?.value) || 0);
+          const masAllaPorKm = Math.round(parseFloat(document.getElementById(`tarifa-masalla-porkm-${tipo}`)?.value) || 0);
+          const kmMaximoAutomatico = parseFloat(document.getElementById(`tarifa-kmmax-${tipo}`)?.value) || TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].kmMaximoAutomatico;
+          nuevaConfig[tipo] = { tramos, masAllaBase, masAllaPorKm, kmMaximoAutomatico };
+        }
+        await set(dbRef(db, 'config_tarifas/armenia'), nuevaConfig);
+        if (statusEl) { statusEl.style.color = '#10B981'; statusEl.textContent = '✅ Guardado — ya se refleja en todas las cotizaciones'; }
+        setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 4000);
+      } catch (e) {
+        console.error('Error al guardar tarifas de cliente:', e);
+        if (statusEl) { statusEl.style.color = '#EF4444'; statusEl.textContent = 'Error al guardar: ' + e.message; }
+      }
+    };
+
     window._cargarSueldos = async function() {
       const cont = document.getElementById('sueldosLista');
       const fechaInput = document.getElementById('sueldosFechaInput');
@@ -8716,6 +8828,66 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
 
   <div id="stats-barrios" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
   <div id="tabla-barrios-admin" style="background:#222;border-radius:10px;overflow:hidden;max-height:600px;overflow-y:auto;"></div>
+</section>
+
+<!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-TARIFAS] SECCIÓN: TARIFAS PREFERENCIALES        ║
+     ╚═══════════════════════════════════════════════════════╝ -->
+<section id="tarifasClienteSection">
+  <h2 style="margin-top:0;margin-bottom:4px;">🏷️ Tarifas de Domicilio por Tipo de Cliente</h2>
+  <p style="color:#999;font-size:13px;margin:0 0 20px;">
+    Define cuánto se cobra por domicilio dentro de Armenia según la distancia, por separado para clientes "local" y "natural". El cambio se aplica al instante en todas las cotizaciones nuevas — no requiere que el cliente cierre y abra la app.
+  </p>
+
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+    <div style="background:#222;border:1px solid #333;border-radius:12px;padding:18px;min-width:280px;flex:1;">
+      <div style="font-weight:700;font-size:15px;margin-bottom:4px;">🏪 Clientes con Local</div>
+      <div style="color:#999;font-size:12px;margin-bottom:12px;">Negocios / locales de venta registrados como tipo "local".</div>
+      <div id="tarifa-tramos-local" style="margin-bottom:10px;"></div>
+      <div style="border-top:1px solid #333;padding-top:10px;margin-top:6px;">
+        <label style="font-size:12px;color:#ccc;">Más allá del último tramo: base $ + $/km adicional</label>
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <input type="number" id="tarifa-masalla-base-local" min="0" step="100" placeholder="Base $"
+            style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
+          <input type="number" id="tarifa-masalla-porkm-local" min="0" step="100" placeholder="$/km"
+            style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
+        </div>
+        <label style="font-size:12px;color:#ccc;display:block;margin-top:8px;">Km máximo para cotizar automático (más allá, el admin confirma)</label>
+        <input type="number" id="tarifa-kmmax-local" min="0" step="1" placeholder="30"
+          style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;margin-top:4px;font-size:14px;">
+      </div>
+    </div>
+    <div style="background:#222;border:1px solid #333;border-radius:12px;padding:18px;min-width:280px;flex:1;">
+      <div style="font-weight:700;font-size:15px;margin-bottom:4px;">🙋 Clientes Persona Natural</div>
+      <div style="color:#999;font-size:12px;margin-bottom:12px;">Clientes registrados como tipo "natural" (piden para uso propio).</div>
+      <div id="tarifa-tramos-natural" style="margin-bottom:10px;"></div>
+      <div style="border-top:1px solid #333;padding-top:10px;margin-top:6px;">
+        <label style="font-size:12px;color:#ccc;">Más allá del último tramo: base $ + $/km adicional</label>
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <input type="number" id="tarifa-masalla-base-natural" min="0" step="100" placeholder="Base $"
+            style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
+          <input type="number" id="tarifa-masalla-porkm-natural" min="0" step="100" placeholder="$/km"
+            style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
+        </div>
+        <label style="font-size:12px;color:#ccc;display:block;margin-top:8px;">Km máximo para cotizar automático (más allá, el admin confirma)</label>
+        <input type="number" id="tarifa-kmmax-natural" min="0" step="1" placeholder="30"
+          style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;margin-top:4px;font-size:14px;">
+      </div>
+    </div>
+  </div>
+
+  <button onclick="window._guardarTarifasCliente()" style="background:#F59E0B;color:#111;border:none;padding:12px 20px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;">
+    💾 Guardar Tarifas
+  </button>
+  <span id="tarifas-cliente-status" style="margin-left:12px;font-size:13px;color:#10B981;"></span>
+
+  <div style="margin-top:24px;padding-top:16px;border-top:1px solid #333;">
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px;">📊 Clientes registrados por tipo</div>
+    <div style="display:flex;gap:20px;">
+      <div>🏪 Locales: <strong id="tarifa-count-local">–</strong></div>
+      <div>🙋 Naturales: <strong id="tarifa-count-natural">–</strong></div>
+    </div>
+  </div>
 </section>
 
 <!-- ╔═══════════════════════════════════════════════════════╗
