@@ -11871,7 +11871,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       const todos = Object.entries(data).map(([uid, d]) => ({
         uid,
         nombre:   d?.nombre || d?.nombreCompleto || d?.displayName || d?.email?.split('@')[0] || `Cliente ${uid.substring(0,8)}`,
-        email:    d?.email || '',
+        email:    d?.email || d?.correo || '',
         telefono: d?.telefono_principal || d?.tel1 || d?.telefono || '',
         direccion: d?.direccion_residencia || d?.direccion || (d?.mis_direcciones ? Object.values(d.mis_direcciones)[0]?.direccion : '') || '',
         activado: d?.activado === true,
