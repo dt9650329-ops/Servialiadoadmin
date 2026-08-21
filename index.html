@@ -4435,6 +4435,58 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       }
     }
 
+    // ── Dictado por voz (Web Speech API) — transcribe directo al input,
+    // igual que el micrófono del teclado, pero sin salir del chat.
+    function initMicIAAdmin() {
+      const micBtn = document.getElementById('iaAdminChatMicBtn');
+      const input = document.getElementById('iaAdminChatInput');
+      if (!micBtn || !input) return;
+
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognitionAPI) {
+        micBtn.style.display = 'none'; // navegador sin soporte (ej. Firefox): se oculta, se usa el teclado normal
+        return;
+      }
+
+      const reconocimiento = new SpeechRecognitionAPI();
+      reconocimiento.lang = 'es-CO';
+      reconocimiento.continuous = false;
+      reconocimiento.interimResults = true;
+
+      let escuchando = false;
+      let baseTexto = '';
+
+      reconocimiento.onstart = function () {
+        escuchando = true;
+        baseTexto = input.value ? input.value.trim() + ' ' : '';
+        micBtn.textContent = '⏹️';
+        micBtn.style.color = '#EF4444';
+      };
+
+      reconocimiento.onresult = function (ev) {
+        let texto = '';
+        for (let i = 0; i < ev.results.length; i++) texto += ev.results[i][0].transcript;
+        input.value = baseTexto + texto;
+      };
+
+      reconocimiento.onerror = function (ev) {
+        if (ev.error !== 'no-speech' && ev.error !== 'aborted') {
+          alert('No se pudo usar el micrófono: ' + ev.error);
+        }
+      };
+
+      reconocimiento.onend = function () {
+        escuchando = false;
+        micBtn.textContent = '🎤';
+        micBtn.style.color = '';
+      };
+
+      micBtn.addEventListener('click', function () {
+        if (escuchando) { reconocimiento.stop(); return; }
+        try { reconocimiento.start(); } catch (e) { /* ya estaba corriendo */ }
+      });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
       const sendBtn = document.getElementById('iaAdminChatSendBtn');
       const input = document.getElementById('iaAdminChatInput');
@@ -4442,6 +4494,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       if (input) input.addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter') { ev.preventDefault(); enviarMensajeIAAdmin(); }
       });
+      initMicIAAdmin();
     });
   })();
   // ┌─────────────────────────────────────────────────────────┐
@@ -10992,18 +11045,19 @@ window.subirBarriosFirebase = async function() {
     <h2 style="margin:0;color:#8B5CF6;font-size:20px;font-weight:800;display:flex;align-items:center;gap:8px;">
       <span>🤖</span> Asistente IA del Administrador
     </h2>
-    <p style="color:var(--text-3);font-size:12px;margin:4px 0 0;">Chat con IA para el panel admin. Ya puede leer quejas de clientes, fallas de la APK del repartidor, chats ofensivos y tiempos de aceptación de pedidos.</p>
+    <p style="color:var(--text-3);font-size:12px;margin:4px 0 0;">Chat con IA para el panel admin. Puede leer quejas de clientes, fallas de la APK del repartidor, chats ofensivos, tiempos de aceptación, estadísticas generales, ubicar repartidores y enviar mensajes a clientes.</p>
   </div>
 
   <!-- ── CHAT ────────────────────────────────────────────── -->
   <div style="display:flex;flex-direction:column;height:min(65vh,560px);background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
     <div class="mensajes-area" id="iaAdminChatBox" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;">
       <div class="mensaje repartidor-msg" style="align-self:flex-start;">
-        <span>👋 Hola, soy el Asistente IA del panel admin. Puedo mostrarte quejas de clientes, fallas de la APK del repartidor, chats marcados como ofensivos, y el tiempo promedio que tardan los repartidores en aceptar un pedido. Pregúntame lo que necesites.</span>
+        <span>👋 Hola, soy el Asistente IA del panel admin. Puedo mostrarte quejas de clientes, fallas de la APK del repartidor, chats marcados como ofensivos, tiempos de aceptación de pedidos, estadísticas generales, ubicar a un repartidor por nombre, y mandarle un mensaje a un cliente. Pregúntame lo que necesites.</span>
       </div>
     </div>
     <div class="chat-input-area" id="iaAdminChatInputArea">
-      <input type="text" id="iaAdminChatInput" placeholder="Escribe tu mensaje..." autocomplete="off">
+      <button id="iaAdminChatMicBtn" type="button" title="Dictar por voz" style="flex:0 0 auto;">🎤</button>
+      <input type="text" id="iaAdminChatInput" placeholder="Escribe o dicta tu mensaje..." autocomplete="off">
       <button id="iaAdminChatSendBtn" type="button">➤</button>
     </div>
   </div>
