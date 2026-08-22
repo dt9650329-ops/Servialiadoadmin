@@ -2111,7 +2111,7 @@ section h2 strong, section h2 span { color: var(--accent); }
 
   <!-- Nav items -->
   <div class="sidebar-nav header-content-wrapper">
-    <button class="tab-btn" data-tab="activarClientesSection"><span class="tab-icon">✅</span> Activar Clientes <span id="badge-clientes-pendientes" style="display:none;background:#3b82f6;color:#fff;border-radius:20px;padding:2px 7px;font-size:11px;margin-left:auto;font-weight:700;min-width:18px;text-align:center;">0</span></button>
+    <button class="tab-btn" data-tab="activarClientesSection"><span class="tab-icon">👥</span> Clientes <span id="badge-clientes-pendientes" style="display:none;background:#3b82f6;color:#fff;border-radius:20px;padding:2px 7px;font-size:11px;margin-left:auto;font-weight:700;min-width:18px;text-align:center;">0</span></button>
     <button class="tab-btn" data-tab="administradoresSection" id="tabAdmins" style="display:none;"><span class="tab-icon">👥</span> Administradores</button>
     <button class="tab-btn" id="tabSOS" data-tab="sosSection" style="border-left:3px solid #EF4444;">
       <span class="tab-icon">🆘</span> Alertas SOS
@@ -2472,7 +2472,7 @@ section h2 strong, section h2 span { color: var(--accent); }
   // └─────────────────────────────────────────────────────────┘
   // ==================== IMPORTS DE FIREBASE ====================
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref as dbRef, onValue, push, remove, set, get, update, off } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getDatabase, ref as dbRef, onValue, push, remove, set, get, update, off, query, orderByChild, startAt, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, getIdToken, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
   import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
@@ -2499,6 +2499,11 @@ section h2 strong, section h2 span { color: var(--accent); }
   window.dbUpdate  = update;
   window.dbRemove  = remove;
   window.dbOnValue = onValue;
+  window.dbQuery       = query;
+  window.dbOrderByChild = orderByChild;
+  window.dbStartAt      = startAt;
+  window.dbOnChildAdded = onChildAdded;
+  window.dbPush         = push;
   const auth = getAuth(app);
   window.auth = auth; // 🔒 Exponer para forzar refresh de token desde fuera del modulo
   // ⚠️ Ajusta la región si tus Cloud Functions no están en us-central1 (la que usa
@@ -3264,6 +3269,10 @@ section h2 strong, section h2 span { color: var(--accent); }
             console.log(`🔑 Rol del admin: ${rol}`);
             // ✅ Asegurar que el listener de "Activar Clientes" arranque ya autenticado
             if (window.iniciarListenerActivarClientes) window.iniciarListenerActivarClientes();
+            // ✅ NUEVO: arrancar el listener del chat persistente de la IA admin
+            // ya autenticado (si arranca sin sesión, la regla de Firebase lo
+            // rechaza y nunca se reintenta solo).
+            if (window.iniciarListenerChatIAAdmin) window.iniciarListenerChatIAAdmin();
           } catch(e) {
             console.warn('⚠️ No se pudo leer el rol, asumiendo super:', e);
             _aplicarRestriccionesRol('super');
@@ -4385,8 +4394,13 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
   // Guarda el historial en memoria (se pierde al recargar la página, igual
   // que el chat de ServiBot del cliente/repartidor).
   (function () {
-    const historialIAAdmin = [];
     let enviandoIAAdmin = false;
+    // Claves (push-id de Firebase) ya pintadas en pantalla — evita que el
+    // listener en vivo repinte un mensaje que ya se mostró (por ejemplo al
+    // recargar la página, cuando el listener "reproduce" todo el historial
+    // de las últimas 24h de una vez).
+    const _mensajesVistosIAAdmin = new Set();
+    let _historialCargadoIAAdmin = false;
 
     function escaparHtmlIAAdmin(texto) {
       const div = document.createElement('div');
@@ -4406,6 +4420,46 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       box.scrollTop = box.scrollHeight;
     }
 
+    // 🆕 Chat persistente (24h): escucha admin_chat_historial en Firebase.
+    // onChildAdded "reproduce" primero todos los mensajes existentes (las
+    // últimas 24h, gracias al query con startAt) y después sigue avisando
+    // de mensajes nuevos en vivo — incluyendo el que empuja onNuevaAlertaSOS
+    // cuando un repartidor activa el SOS, sin que el admin tenga que
+    // preguntar nada. Así la conversación nunca se "cierra": solo se va
+    // vaciando sola por la limpieza automática de 24h en el backend.
+    window.iniciarListenerChatIAAdmin = function () {
+      if (window._chatIAAdminListenerActivo) return;
+      if (!window.db || !window.dbRef || !window.dbQuery || !window.dbOrderByChild || !window.dbStartAt || !window.dbOnChildAdded) return;
+      window._chatIAAdminListenerActivo = true;
+
+      const hace24h = Date.now() - 24 * 60 * 60 * 1000;
+      const q = window.dbQuery(
+        window.dbRef(window.db, 'admin_chat_historial'),
+        window.dbOrderByChild('ts'),
+        window.dbStartAt(hace24h)
+      );
+
+      window.dbOnChildAdded(q, function (snap) {
+        const key = snap.key;
+        if (_mensajesVistosIAAdmin.has(key)) return;
+        _mensajesVistosIAAdmin.add(key);
+        const m = snap.val();
+        if (!m || typeof m.content !== 'string') return;
+
+        // Apenas llega el primer mensaje real del historial, se quita el
+        // saludo fijo de bienvenida (si ya hay conversación, no hace falta).
+        if (!_historialCargadoIAAdmin) {
+          const box = document.getElementById('iaAdminChatBox');
+          if (box) box.innerHTML = '';
+          _historialCargadoIAAdmin = true;
+        }
+        pintarMensajeIAAdmin(m.content, m.role === 'user');
+      }, function (error) {
+        console.warn('⚠️ [ChatIAAdmin] Listener de historial falló, se reintentará al re-autenticar:', error.message);
+        window._chatIAAdminListenerActivo = false;
+      });
+    };
+
     async function enviarMensajeIAAdmin() {
       const input = document.getElementById('iaAdminChatInput');
       const btn = document.getElementById('iaAdminChatSendBtn');
@@ -4414,18 +4468,17 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       if (!mensaje) return;
       if (!auth.currentUser) { alert('Debes iniciar sesión para usar el Asistente IA.'); return; }
 
-      pintarMensajeIAAdmin(mensaje, true);
-      historialIAAdmin.push({ role: 'user', content: mensaje });
       input.value = '';
       enviandoIAAdmin = true;
       if (btn) btn.disabled = true;
 
       try {
         const llamarAdminBot = window.dbHttpsCallable(window.dbFunctions, 'adminBotChat');
-        const resp = await llamarAdminBot({ mensaje, historial: historialIAAdmin });
-        const respuesta = (resp.data && resp.data.respuesta) ? resp.data.respuesta : 'No obtuve respuesta, intenta de nuevo.';
-        pintarMensajeIAAdmin(respuesta, false);
-        historialIAAdmin.push({ role: 'model', content: respuesta });
+        // No pintamos nada acá directamente: adminBotChat guarda tanto el
+        // mensaje del admin como la respuesta de la IA en
+        // admin_chat_historial, y el listener de arriba los pinta apenas
+        // llegan — así queda todo persistido sin pintar nada dos veces.
+        await llamarAdminBot({ mensaje });
       } catch (e) {
         console.error('❌ Error en Asistente IA admin:', e);
         pintarMensajeIAAdmin('⚠️ Hubo un error consultando al asistente. Intenta de nuevo en un momento.', false);
@@ -4483,7 +4536,12 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
 
       micBtn.addEventListener('click', function () {
         if (escuchando) { reconocimiento.stop(); return; }
-        try { reconocimiento.start(); } catch (e) { /* ya estaba corriendo */ }
+        micBtn.textContent = '🎙️'; // feedback inmediato al tocar, antes de que el motor conecte
+        micBtn.disabled = true;
+        try {
+          reconocimiento.start();
+        } catch (e) { /* ya estaba corriendo */ }
+        setTimeout(() => { micBtn.disabled = false; }, 300);
       });
     }
 
@@ -4495,6 +4553,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
         if (ev.key === 'Enter') { ev.preventDefault(); enviarMensajeIAAdmin(); }
       });
       initMicIAAdmin();
+      if (window.auth && window.auth.currentUser) window.iniciarListenerChatIAAdmin();
     });
   })();
   // ┌─────────────────────────────────────────────────────────┐
@@ -11045,14 +11104,14 @@ window.subirBarriosFirebase = async function() {
     <h2 style="margin:0;color:#8B5CF6;font-size:20px;font-weight:800;display:flex;align-items:center;gap:8px;">
       <span>🤖</span> Asistente IA del Administrador
     </h2>
-    <p style="color:var(--text-3);font-size:12px;margin:4px 0 0;">Chat con IA para el panel admin. Puede leer quejas de clientes, fallas de la APK del repartidor, chats ofensivos, tiempos de aceptación, estadísticas generales, ubicar repartidores y enviar mensajes a clientes.</p>
+    <p style="color:var(--text-3);font-size:12px;margin:4px 0 0;">Chat con IA para el panel admin. Puede leer quejas de clientes, fallas de la APK del repartidor, chats ofensivos, tiempos de aceptación, estadísticas generales, ubicar repartidores, enviar mensajes a clientes, publicar avisos generales, y regalar giros de ruleta o cupones.</p>
   </div>
 
   <!-- ── CHAT ────────────────────────────────────────────── -->
   <div style="display:flex;flex-direction:column;height:min(65vh,560px);background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
     <div class="mensajes-area" id="iaAdminChatBox" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;">
       <div class="mensaje repartidor-msg" style="align-self:flex-start;">
-        <span>👋 Hola, soy el Asistente IA del panel admin. Puedo mostrarte quejas de clientes, fallas de la APK del repartidor, chats marcados como ofensivos, tiempos de aceptación de pedidos, estadísticas generales, ubicar a un repartidor por nombre, y mandarle un mensaje a un cliente. Pregúntame lo que necesites.</span>
+        <span>👋 Hola, soy el Asistente IA del panel admin. Puedo mostrarte quejas de clientes, fallas de la APK del repartidor, chats marcados como ofensivos, tiempos de aceptación de pedidos, estadísticas generales, ubicar a un repartidor por nombre, mandarle un mensaje a un cliente, publicar un aviso general para todos, o regalarle giros de ruleta/cupones a un cliente puntual. Pregúntame lo que necesites.</span>
       </div>
     </div>
     <div class="chat-input-area" id="iaAdminChatInputArea">
@@ -11161,10 +11220,10 @@ window.subirBarriosFirebase = async function() {
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px;">
     <div>
       <h2 style="margin:0;font-size:20px;font-weight:800;display:flex;align-items:center;gap:8px;">
-        ✅ Activar Clientes Nuevos
+        👥 Clientes
         <span id="badge-ac-pendientes" style="display:none;background:#3b82f6;color:#fff;border-radius:20px;padding:2px 9px;font-size:12px;font-weight:700;"></span>
       </h2>
-      <p style="color:var(--text-3);font-size:12px;margin:4px 0 0;">Perfiles nuevos pendientes de activación. Solo los clientes activados pueden solicitar domicilios.</p>
+      <p style="color:var(--text-3);font-size:12px;margin:4px 0 0;">Activa perfiles nuevos y administra si cada cliente es persona natural o tiene un local (define su tarifa y el acceso a ServiBot).</p>
     </div>
     <button onclick="window.cargarClientesPendientes()" style="background:var(--surface2);color:var(--text-2);border:1px solid var(--border);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;">🔄 Refrescar</button>
   </div>
@@ -12079,6 +12138,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         telefono: d?.telefono_principal || d?.tel1 || d?.telefono || '',
         direccion: d?.direccion_residencia || d?.direccion || (d?.mis_direcciones ? Object.values(d.mis_direcciones)[0]?.direccion : '') || '',
         activado: d?.activado === true,
+        tipoCliente: d?.tipoCliente || 'natural',
         fechaRegistro: d?.fechaRegistro || d?.createdAt || null,
       }));
 
@@ -12131,6 +12191,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
             <div style="font-weight:700;color:var(--text);font-size:14px;">👤 ${c.nombre}</div>
             ${c.telefono ? `<div style="font-size:12px;color:var(--text-3);">📱 ${c.telefono}</div>` : ''}
             ${c.email    ? `<div style="font-size:12px;color:var(--text-3);">✉️ ${c.email}</div>`    : ''}
+            <span style="display:inline-block;margin-top:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
+                         background:${c.tipoCliente === 'local' ? 'rgba(139,92,246,0.15)' : 'rgba(148,163,184,0.15)'};
+                         color:${c.tipoCliente === 'local' ? '#8B5CF6' : '#94a3b8'};">
+              ${c.tipoCliente === 'local' ? '🏪 Tiene local' : '🙋 Persona natural'}
+            </span>
             <div style="font-size:11px;color:var(--text-3);margin-top:3px;">📅 Registrado: ${fecha}</div>
             <div style="font-size:10px;color:#475569;font-family:monospace;margin-top:2px;">${c.uid.substring(0,20)}…</div>
           </div>
@@ -12185,6 +12250,27 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
               ${esPendiente ? '⏳ Pendiente' : '✅ Activo'}
             </span>
           </div>
+          <div style="margin-top:6px;padding-top:12px;border-top:1px solid var(--border);">
+            <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:8px;">Tipo de cliente (define tarifa y acceso a ServiBot):</div>
+            <div style="display:flex;gap:8px;">
+              <button onclick="window.cambiarTipoClienteAC('${c.uid}', 'natural')"
+                      ${c.tipoCliente !== 'local' ? 'disabled' : ''}
+                      style="flex:1;padding:9px;border-radius:8px;font-size:12px;font-weight:700;font-family:inherit;cursor:${c.tipoCliente !== 'local' ? 'default' : 'pointer'};
+                             background:${c.tipoCliente !== 'local' ? '#94a3b8' : 'var(--surface3)'};
+                             color:${c.tipoCliente !== 'local' ? '#fff' : 'var(--text-2)'};
+                             border:1px solid ${c.tipoCliente !== 'local' ? '#94a3b8' : 'var(--border)'};">
+                🙋 Persona natural${c.tipoCliente !== 'local' ? ' ✓' : ''}
+              </button>
+              <button onclick="window.cambiarTipoClienteAC('${c.uid}', 'local')"
+                      ${c.tipoCliente === 'local' ? 'disabled' : ''}
+                      style="flex:1;padding:9px;border-radius:8px;font-size:12px;font-weight:700;font-family:inherit;cursor:${c.tipoCliente === 'local' ? 'default' : 'pointer'};
+                             background:${c.tipoCliente === 'local' ? '#8B5CF6' : 'var(--surface3)'};
+                             color:${c.tipoCliente === 'local' ? '#fff' : 'var(--text-2)'};
+                             border:1px solid ${c.tipoCliente === 'local' ? '#8B5CF6' : 'var(--border)'};">
+                🏪 Tiene local${c.tipoCliente === 'local' ? ' ✓' : ''}
+              </button>
+            </div>
+          </div>
         </div>
         <button onclick="document.getElementById('modalDetalleClienteAC').remove();window.toggleActivarCliente('${c.uid}', ${c.activado})"
                 style="margin-top:16px;width:100%;background:${esPendiente ? '#10b981' : 'rgba(239,68,68,0.15)'};
@@ -12195,6 +12281,23 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         </button>
       </div>`;
     document.body.appendChild(modal);
+  };
+
+  // Cambiar tipo de cliente (natural ⇄ local) desde la modal de detalle.
+  // Igual que toggleActivarCliente: refresca token antes de escribir, y
+  // espeja en users/ como ya hace el guardado normal desde index.html.
+  window.cambiarTipoClienteAC = async function(uid, nuevoTipo) {
+    if (nuevoTipo !== 'natural' && nuevoTipo !== 'local') return;
+    try {
+      await window.forzarRefreshToken();
+      await window.dbUpdate(window.dbRef(window.db, `usuarios/${uid}`), { tipoCliente: nuevoTipo });
+      window.dbUpdate(window.dbRef(window.db, `users/${uid}`), { tipoCliente: nuevoTipo }).catch(() => {});
+      // El listener en tiempo real re-renderiza la lista; solo cerramos la modal.
+      const modal = document.getElementById('modalDetalleClienteAC');
+      if (modal) modal.remove();
+    } catch(e) {
+      alert('❌ Error al cambiar el tipo de cliente: ' + e.message);
+    }
   };
 
   // Activar / desactivar cliente
