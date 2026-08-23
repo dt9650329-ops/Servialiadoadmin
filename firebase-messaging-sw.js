@@ -2,10 +2,14 @@
 // firebase-messaging-sw.js — Service Worker de notificaciones push
 // para el PANEL ADMINISTRADOR de Servi Aliados.
 //
-// ⚠️ IMPORTANTE: este archivo debe quedar en la RAÍZ del sitio (al
-// mismo nivel que index.html del panel admin), NO dentro de una
-// subcarpeta — así el navegador lo puede registrar con scope "/" y
-// recibir notificaciones aunque la pestaña esté cerrada del todo.
+// ⚠️ IMPORTANTE: este archivo debe quedar en la RAÍZ del proyecto
+// (al mismo nivel que index.html del panel admin), sea cual sea la
+// carpeta/repo donde termine publicado — así el navegador lo registra
+// con scope relativo a esa carpeta y recibe notificaciones aunque la
+// pestaña esté cerrada del todo. Las rutas de este archivo son
+// relativas a propósito (sin "/" al inicio) para que funcionen igual
+// si el sitio se publica en la raíz del dominio o en una subcarpeta
+// (ej. dt9650329-ops.github.io/Servialiadoadmin/).
 //
 // No necesita edición manual aparte de la config de Firebase (que es
 // la misma que ya usa index.html — no es secreta, es pública por
@@ -35,8 +39,8 @@ messaging.onBackgroundMessage(function (payload) {
 
   self.registration.showNotification(titulo, {
     body: cuerpo,
-    icon: '/icon-192.png',   // opcional: si no existe este archivo, el navegador usa un ícono por defecto
-    badge: '/icon-192.png',  // opcional
+    icon: 'icon-192.png',   // opcional: si no existe este archivo, el navegador usa un ícono por defecto
+    badge: 'icon-192.png',  // opcional
     data: payload.data || {},
     tag: 'servi-aliados-admin-alerta', // agrupa notificaciones seguidas en vez de amontonarlas
   });
@@ -50,8 +54,7 @@ self.addEventListener('notificationclick', function (event) {
       for (const c of listaClientes) {
         if ('focus' in c) return c.focus();
       }
-      if (clients.openWindow) return clients.openWindow('/');
+      if (clients.openWindow) return clients.openWindow(self.registration.scope);
     })
   );
 });
-      
