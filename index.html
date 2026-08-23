@@ -2472,10 +2472,11 @@ section h2 strong, section h2 span { color: var(--accent); }
   // └─────────────────────────────────────────────────────────┘
   // ==================== IMPORTS DE FIREBASE ====================
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref as dbRef, onValue, push, remove, set, get, update, off, query, orderByChild, startAt, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getDatabase, ref as dbRef, onValue, push, remove, set, get, update, off, query, orderByChild, startAt, onChildAdded, onChildChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, getIdToken, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
   import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
+  import { getMessaging, getToken as getFcmToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
   // ┌─────────────────────────────────────────────────────────┐
   // │ [JS-02] CONFIGURACIÓN FIREBASE                          │
   // └─────────────────────────────────────────────────────────┘
@@ -2503,6 +2504,7 @@ section h2 strong, section h2 span { color: var(--accent); }
   window.dbOrderByChild = orderByChild;
   window.dbStartAt      = startAt;
   window.dbOnChildAdded = onChildAdded;
+  window.dbOnChildChanged = onChildChanged;
   window.dbPush         = push;
   const auth = getAuth(app);
   window.auth = auth; // 🔒 Exponer para forzar refresh de token desde fuera del modulo
@@ -2511,6 +2513,54 @@ section h2 strong, section h2 span { color: var(--accent); }
   const functionsClient = getFunctions(app);
   window.dbFunctions = functionsClient;
   window.dbHttpsCallable = httpsCallable;
+
+  // ══════════════════════════════════════════════════════════
+  // 🆕 WEB PUSH (FCM) PARA EL PANEL ADMIN
+  // Notificaciones push reales al celular/PC del admin, incluso con el
+  // panel cerrado del todo (no solo en segundo plano). Requiere:
+  //   1) Un archivo firebase-messaging-sw.js en la RAÍZ del sitio (junto
+  //      a este index.html) — ya generado aparte, súbelo tal cual.
+  //   2) Reemplazar VAPID_KEY_ADMIN abajo por la clave pública que se
+  //      genera en Firebase Console → Configuración del proyecto →
+  //      Cloud Messaging → "Certificados push web" → Generar par de claves.
+  // Sin esa clave, activarNotificacionesAdminPush() falla con un aviso
+  // claro en vez de romper el resto del panel.
+  // ══════════════════════════════════════════════════════════
+  const VAPID_KEY_ADMIN = BG1FDsGnszdDbpsPaudt7RBhSI6Lr8bxu9za46-n0ItknGvwxL68fEbPDaHD4Qp5qIcltzqjCS_M5i3DdsgRwP0
+  let messagingAdmin = null;
+  try { messagingAdmin = getMessaging(app); } catch (e) { console.warn('[Push] Messaging no disponible en este navegador:', e.message); }
+
+  window.activarNotificacionesAdminPush = async function () {
+    if (!messagingAdmin) { alert('Este navegador no soporta notificaciones push.'); return false; }
+    if (VAPID_KEY_ADMIN === 'PEGA_AQUI_TU_VAPID_KEY_PUBLICA') {
+      alert('Falta configurar la VAPID key en el código (VAPID_KEY_ADMIN) antes de poder activar las notificaciones.');
+      return false;
+    }
+    if (!auth.currentUser) { alert('Debes iniciar sesión primero.'); return false; }
+    try {
+      const permiso = await Notification.requestPermission();
+      if (permiso !== 'granted') { alert('No diste permiso de notificaciones — no podré avisarte con el panel cerrado.'); return false; }
+
+      const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      const token = await getFcmToken(messagingAdmin, { vapidKey: VAPID_KEY_ADMIN, serviceWorkerRegistration: reg });
+      if (!token) { alert('No se pudo obtener el token de notificaciones. Intenta de nuevo.'); return false; }
+
+      await update(dbRef(db, `admins/${auth.currentUser.uid}`), { fcmTokenWeb: token });
+
+      // Mensajes que llegan mientras el panel está en primer plano (la
+      // notificación del sistema no se muestra sola en ese caso).
+      onMessage(messagingAdmin, function (payload) {
+        console.log('[Push] Notificación en primer plano:', payload);
+      });
+
+      window._notifsAdminActivas = true;
+      return true;
+    } catch (e) {
+      console.error('❌ Error activando notificaciones push:', e);
+      alert('No se pudieron activar las notificaciones: ' + e.message);
+      return false;
+    }
+  };
   // 🔒 FIX: refresca el ID token antes de escrituras criticas (ej. activar cliente).
   // Evita el "permission_denied" cuando la pestana estuvo en segundo plano largo rato
   // y el refresh automatico de Firebase no llego a correr a tiempo.
@@ -4408,25 +4458,111 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       return div.innerHTML;
     }
 
-    function pintarMensajeIAAdmin(texto, esAdmin) {
+    function pintarMensajeIAAdmin(texto, esAdmin, esAlerta) {
       const box = document.getElementById('iaAdminChatBox');
       if (!box) return;
       const wrap = document.createElement('div');
       wrap.className = 'mensaje ' + (esAdmin ? 'admin' : 'repartidor-msg');
       wrap.style.alignSelf = esAdmin ? 'flex-end' : 'flex-start';
+      // Las alertas automáticas (quejas, lenguaje ofensivo, conexión de
+      // repartidores, SOS) se pintan con un borde propio para que el admin
+      // las distinga de un turno normal de conversación con la IA.
+      if (esAlerta) {
+        wrap.style.border = '1px solid #F59E0B';
+        wrap.style.background = 'rgba(245,158,11,0.08)';
+      }
       const hora = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
       wrap.innerHTML = '<span>' + escaparHtmlIAAdmin(texto).replace(/\n/g, '<br>') + '</span><span class="chat-time">' + hora + '</span>';
       box.appendChild(wrap);
       box.scrollTop = box.scrollHeight;
     }
 
+    // 🆕 PAPELERA DE ALERTAS — mapa en memoria: key -> { texto, ts } de
+    // cada alerta automática (esAlerta:true) todavía marcada leida:false.
+    // Se llena con el listener en vivo de abajo y también con
+    // refrescarPapeleraIAAdmin() (botón 🔄, por si el listener se cayó).
+    const _alertasNoLeidasIAAdmin = new Map();
+
+    function _renderPapeleraIAAdmin() {
+      const badge = document.getElementById('iaAdminPapeleraBadge');
+      const lista = document.getElementById('iaAdminPapeleraLista');
+      const vacia = document.getElementById('iaAdminPapeleraVacia');
+      if (!badge || !lista || !vacia) return;
+
+      const total = _alertasNoLeidasIAAdmin.size;
+      badge.style.display = total > 0 ? 'flex' : 'none';
+      badge.textContent = total > 99 ? '99+' : String(total);
+
+      const items = Array.from(_alertasNoLeidasIAAdmin.values()).sort((a, b) => b.ts - a.ts);
+      vacia.style.display = items.length === 0 ? 'block' : 'none';
+      lista.innerHTML = items.map(function (a) {
+        const hora = new Date(a.ts).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        return '<div style="background:var(--surface1,#1a1a2e);border:1px solid #F59E0B;border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text-1);">'
+          + escaparHtmlIAAdmin(a.texto).replace(/\n/g, '<br>')
+          + '<div style="color:var(--text-3);font-size:11px;margin-top:4px;">' + hora + '</div></div>';
+      }).join('') + (items.length > 0
+        ? '<button id="iaAdminPapeleraMarcarBtn" type="button" style="margin-top:4px;background:#8B5CF6;color:#fff;border:none;padding:9px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;">✓ Marcar todas como leídas</button>'
+        : '');
+
+      const marcarBtn = document.getElementById('iaAdminPapeleraMarcarBtn');
+      if (marcarBtn) marcarBtn.addEventListener('click', _marcarAlertasLeidasIAAdmin);
+    }
+
+    async function _marcarAlertasLeidasIAAdmin() {
+      if (!auth.currentUser) return;
+      try {
+        const llamar = window.dbHttpsCallable(window.dbFunctions, 'marcarAlertasAdminLeidas');
+        await llamar({});
+        _alertasNoLeidasIAAdmin.clear();
+        _renderPapeleraIAAdmin();
+      } catch (e) {
+        console.error('❌ Error marcando alertas como leídas:', e);
+        alert('No se pudo marcar las alertas como leídas. Intenta de nuevo.');
+      }
+    }
+
+    // Botón 🔄 Refrescar: vuelve a consultar el historial de las últimas 24h
+    // por si el listener en vivo se cayó (ej. la pestaña estuvo suspendida
+    // largo rato) y quedaron alertas sin contar en la papelera.
+    async function refrescarPapeleraIAAdmin() {
+      if (!window.db || !window.dbRef || !window.dbQuery || !window.dbOrderByChild || !window.dbStartAt || !window.dbGet) return;
+      const btn = document.getElementById('iaAdminRefrescarBtn');
+      if (btn) btn.disabled = true;
+      try {
+        const hace24h = Date.now() - 24 * 60 * 60 * 1000;
+        const q = window.dbQuery(
+          window.dbRef(window.db, 'admin_chat_historial'),
+          window.dbOrderByChild('ts'),
+          window.dbStartAt(hace24h)
+        );
+        const snap = await window.dbGet(q);
+        if (snap.exists()) {
+          snap.forEach(function (child) {
+            const m = child.val();
+            if (m && m.esAlerta === true && m.leida === false) {
+              _alertasNoLeidasIAAdmin.set(child.key, { texto: m.content, ts: m.ts || Date.now() });
+            } else {
+              _alertasNoLeidasIAAdmin.delete(child.key);
+            }
+          });
+        }
+        _renderPapeleraIAAdmin();
+      } catch (e) {
+        console.error('❌ Error refrescando papelera:', e);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+    window.refrescarPapeleraIAAdmin = refrescarPapeleraIAAdmin;
+
     // 🆕 Chat persistente (24h): escucha admin_chat_historial en Firebase.
     // onChildAdded "reproduce" primero todos los mensajes existentes (las
     // últimas 24h, gracias al query con startAt) y después sigue avisando
-    // de mensajes nuevos en vivo — incluyendo el que empuja onNuevaAlertaSOS
-    // cuando un repartidor activa el SOS, sin que el admin tenga que
-    // preguntar nada. Así la conversación nunca se "cierra": solo se va
-    // vaciando sola por la limpieza automática de 24h en el backend.
+    // de mensajes nuevos en vivo — incluyendo las alertas automáticas
+    // (quejas, lenguaje ofensivo, conexión de repartidores, SOS) que el
+    // backend empuja solo, sin que el admin tenga que preguntar nada. Así
+    // la conversación nunca se "cierra": solo se va vaciando sola por la
+    // limpieza automática de 24h en el backend.
     window.iniciarListenerChatIAAdmin = function () {
       if (window._chatIAAdminListenerActivo) return;
       if (!window.db || !window.dbRef || !window.dbQuery || !window.dbOrderByChild || !window.dbStartAt || !window.dbOnChildAdded) return;
@@ -4453,11 +4589,29 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           if (box) box.innerHTML = '';
           _historialCargadoIAAdmin = true;
         }
-        pintarMensajeIAAdmin(m.content, m.role === 'user');
+        pintarMensajeIAAdmin(m.content, m.role === 'user', m.esAlerta === true);
+
+        if (m.esAlerta === true && m.leida === false) {
+          _alertasNoLeidasIAAdmin.set(key, { texto: m.content, ts: m.ts || Date.now() });
+          _renderPapeleraIAAdmin();
+        }
       }, function (error) {
         console.warn('⚠️ [ChatIAAdmin] Listener de historial falló, se reintentará al re-autenticar:', error.message);
         window._chatIAAdminListenerActivo = false;
       });
+
+      // También escucha cambios (ej. cuando marcarAlertasAdminLeidas pone
+      // leida:true) para que la papelera se limpie sola si se marcó como
+      // leída desde otra pestaña/sesión del mismo admin.
+      if (window.dbOnChildChanged) {
+        window.dbOnChildChanged(q, function (snap) {
+          const m = snap.val();
+          if (m && m.esAlerta === true && m.leida === true && _alertasNoLeidasIAAdmin.has(snap.key)) {
+            _alertasNoLeidasIAAdmin.delete(snap.key);
+            _renderPapeleraIAAdmin();
+          }
+        });
+      }
     };
 
     async function enviarMensajeIAAdmin() {
@@ -4554,6 +4708,30 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       });
       initMicIAAdmin();
       if (window.auth && window.auth.currentUser) window.iniciarListenerChatIAAdmin();
+
+      const papeleraBtn = document.getElementById('iaAdminPapeleraBtn');
+      const papeleraPanel = document.getElementById('iaAdminPapeleraPanel');
+      if (papeleraBtn && papeleraPanel) {
+        papeleraBtn.addEventListener('click', function () {
+          const abierta = papeleraPanel.style.display !== 'none';
+          papeleraPanel.style.display = abierta ? 'none' : 'block';
+          if (!abierta) _renderPapeleraIAAdmin();
+        });
+      }
+
+      const refrescarBtn = document.getElementById('iaAdminRefrescarBtn');
+      if (refrescarBtn) refrescarBtn.addEventListener('click', refrescarPapeleraIAAdmin);
+
+      const activarPushBtn = document.getElementById('iaAdminActivarPushBtn');
+      if (activarPushBtn) activarPushBtn.addEventListener('click', async function () {
+        activarPushBtn.disabled = true;
+        const ok = await window.activarNotificacionesAdminPush();
+        activarPushBtn.disabled = false;
+        if (ok) {
+          activarPushBtn.textContent = '🔔 Notificaciones activadas';
+          activarPushBtn.style.color = '#22C55E';
+        }
+      });
     });
   })();
   // ┌─────────────────────────────────────────────────────────┐
@@ -11105,6 +11283,29 @@ window.subirBarriosFirebase = async function() {
       <span>🤖</span> Asistente IA del Administrador
     </h2>
     <p style="color:var(--text-3);font-size:12px;margin:4px 0 0;">Chat con IA para el panel admin. Puede leer quejas de clientes, fallas de la APK del repartidor, chats ofensivos, tiempos de aceptación, estadísticas generales, ubicar repartidores, enviar mensajes a clientes, publicar avisos generales, y regalar giros de ruleta o cupones.</p>
+  </div>
+
+  <!-- ── PAPELERA DE ALERTAS AUTOMÁTICAS ──────────────────── -->
+  <!-- Bandeja de mensajes que la IA envió sola al chat (quejas, lenguaje
+       ofensivo, conexión/desconexión de repartidores, SOS) y que el admin
+       todavía no ha visto. El botón Refrescar re-consulta el servidor por
+       si el listener en vivo se cayó mientras el panel estaba cerrado. -->
+  <div style="display:flex;gap:8px;margin-bottom:10px;">
+    <button id="iaAdminPapeleraBtn" type="button" style="position:relative;flex:1;background:var(--surface2);color:var(--text-1);border:1px solid var(--border);padding:10px 14px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;">
+      🗑️ Papelera de alertas
+      <span id="iaAdminPapeleraBadge" style="display:none;background:#EF4444;color:#fff;border-radius:999px;min-width:20px;height:20px;padding:0 6px;font-size:12px;font-weight:800;align-items:center;justify-content:center;">0</span>
+    </button>
+    <button id="iaAdminRefrescarBtn" type="button" title="Refrescar alertas no vistas" style="background:var(--surface2);color:var(--text-2);border:1px solid var(--border);padding:10px 12px;border-radius:10px;cursor:pointer;font-size:15px;flex-shrink:0;">🔄</button>
+  </div>
+
+  <!-- ── NOTIFICACIONES PUSH (celular/panel cerrado) ──────── -->
+  <button id="iaAdminActivarPushBtn" type="button" style="width:100%;margin-bottom:10px;background:var(--surface2);color:var(--text-1);border:1px solid var(--border);padding:9px 14px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;">
+    🔔 Activar notificaciones con el panel cerrado
+  </button>
+
+  <div id="iaAdminPapeleraPanel" style="display:none;margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px;max-height:260px;overflow-y:auto;">
+    <div id="iaAdminPapeleraLista" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="iaAdminPapeleraVacia" style="display:none;color:var(--text-3);font-size:13px;text-align:center;padding:10px;">No tienes alertas sin ver 🎉</div>
   </div>
 
   <!-- ── CHAT ────────────────────────────────────────────── -->
