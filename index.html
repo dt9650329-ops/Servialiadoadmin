@@ -2541,7 +2541,7 @@ section h2 strong, section h2 span { color: var(--accent); }
       const permiso = await Notification.requestPermission();
       if (permiso !== 'granted') { alert('No diste permiso de notificaciones — no podré avisarte con el panel cerrado.'); return false; }
 
-      const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
       const token = await getFcmToken(messagingAdmin, { vapidKey: VAPID_KEY_ADMIN, serviceWorkerRegistration: reg });
       if (!token) { alert('No se pudo obtener el token de notificaciones. Intenta de nuevo.'); return false; }
 
