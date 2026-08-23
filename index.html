@@ -2476,7 +2476,6 @@ section h2 strong, section h2 span { color: var(--accent); }
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider, getIdToken, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
   import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
-  import { getMessaging, getToken as getFcmToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
   // ┌─────────────────────────────────────────────────────────┐
   // │ [JS-02] CONFIGURACIÓN FIREBASE                          │
   // └─────────────────────────────────────────────────────────┘
@@ -2514,98 +2513,6 @@ section h2 strong, section h2 span { color: var(--accent); }
   window.dbFunctions = functionsClient;
   window.dbHttpsCallable = httpsCallable;
 
-  // ══════════════════════════════════════════════════════════
-  // 🆕 WEB PUSH (FCM) PARA EL PANEL ADMIN
-  // Notificaciones push reales al celular/PC del admin, incluso con el
-  // panel cerrado del todo (no solo en segundo plano). Requiere:
-  //   1) Un archivo firebase-messaging-sw.js en la RAÍZ del sitio (junto
-  //      a este index.html) — ya generado aparte, súbelo tal cual.
-  //   2) Reemplazar VAPID_KEY_ADMIN abajo por la clave pública que se
-  //      genera en Firebase Console → Configuración del proyecto →
-  //      Cloud Messaging → "Certificados push web" → Generar par de claves.
-  // Sin esa clave, activarNotificacionesAdminPush() falla con un aviso
-  // claro en vez de romper el resto del panel.
-  // ══════════════════════════════════════════════════════════
-  const VAPID_KEY_ADMIN = 'BG1FDsGnszdDbpsPaudt7RBhSI6Lr8bxu9za46-n0ItknGvwxL68fEbPDaHD4Qp5qIcltzqjCS_M5i3DdsgRwP0';
-  let messagingAdmin = null;
-  try { messagingAdmin = getMessaging(app); } catch (e) { console.warn('[Push] Messaging no disponible en este navegador:', e.message); }
-
-  window.activarNotificacionesAdminPush = async function () {
-    if (!messagingAdmin) { alert('Este navegador no soporta notificaciones push.'); return false; }
-    if (VAPID_KEY_ADMIN === 'PEGA_AQUI_TU_VAPID_KEY_PUBLICA') {
-      alert('Falta configurar la VAPID key en el código (VAPID_KEY_ADMIN) antes de poder activar las notificaciones.');
-      return false;
-    }
-    if (!auth.currentUser) { alert('Debes iniciar sesión primero.'); return false; }
-    try {
-      const permiso = await Notification.requestPermission();
-      if (permiso !== 'granted') { alert('No diste permiso de notificaciones — no podré avisarte con el panel cerrado.'); return false; }
-
-      const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
-      const token = await getFcmToken(messagingAdmin, { vapidKey: VAPID_KEY_ADMIN, serviceWorkerRegistration: reg });
-      if (!token) { alert('No se pudo obtener el token de notificaciones. Intenta de nuevo.'); return false; }
-
-      await update(dbRef(db, `admins/${auth.currentUser.uid}`), { fcmTokenWeb: token });
-
-      // Mensajes que llegan mientras el panel está en primer plano (la
-      // notificación del sistema no se muestra sola en ese caso).
-      onMessage(messagingAdmin, function (payload) {
-        console.log('[Push] Notificación en primer plano:', payload);
-      });
-
-      window._notifsAdminActivas = true;
-      return true;
-    } catch (e) {
-      console.error('❌ Error activando notificaciones push:', e);
-      alert('No se pudieron activar las notificaciones: ' + e.message);
-      return false;
-    }
-  };
-
-  // ✅ NUEVO: al recargar la página, el permiso del navegador se conserva
-  // (el usuario no tiene que volver a aceptarlo), pero el botón siempre
-  // arrancaba en "Activar" porque nadie revisaba ese permiso al cargar.
-  // Esta función se llama una vez el admin queda autenticado: si el
-  // navegador ya tiene el permiso concedido, repite en silencio (sin
-  // alerts ni volver a pedir permiso) el registro del service worker y
-  // la obtención/guardado del token, y deja el botón en verde.
-  window._sincronizarBotonPushAdmin = async function () {
-    try {
-      if (!messagingAdmin) return;
-      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-      if (!auth.currentUser) return;
-
-      const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js');
-      const token = await getFcmToken(messagingAdmin, { vapidKey: VAPID_KEY_ADMIN, serviceWorkerRegistration: reg });
-      if (!token) return;
-
-      await update(dbRef(db, `admins/${auth.currentUser.uid}`), { fcmTokenWeb: token });
-
-      onMessage(messagingAdmin, function (payload) {
-        console.log('[Push] Notificación en primer plano:', payload);
-      });
-
-      window._notifsAdminActivas = true;
-
-      // El botón vive en el DOM desde el HTML estático, pero puede que
-      // aún no esté listo cuando esto corre — reintenta unas veces.
-      let intentos = 0;
-      const marcarBoton = () => {
-        const btn = document.getElementById('iaAdminActivarPushBtn');
-        if (btn) {
-          btn.textContent = '🔔 Notificaciones activadas';
-          btn.style.color = '#22C55E';
-          return;
-        }
-        if (intentos++ < 20) setTimeout(marcarBoton, 250);
-      };
-      marcarBoton();
-    } catch (e) {
-      // Silencioso a propósito: si falla, el botón simplemente se queda
-      // mostrando "Activar" y el admin puede tocarlo manualmente de nuevo.
-      console.warn('[Push] No se pudo re-sincronizar notificaciones al cargar:', e.message);
-    }
-  };
   // 🔒 FIX: refresca el ID token antes de escrituras criticas (ej. activar cliente).
   // Evita el "permission_denied" cuando la pestana estuvo en segundo plano largo rato
   // y el refresh automatico de Firebase no llego a correr a tiempo.
@@ -3368,10 +3275,6 @@ section h2 strong, section h2 span { color: var(--accent); }
             // ya autenticado (si arranca sin sesión, la regla de Firebase lo
             // rechaza y nunca se reintenta solo).
             if (window.iniciarListenerChatIAAdmin) window.iniciarListenerChatIAAdmin();
-            // ✅ NUEVO: revisa si las notificaciones push ya estaban activadas
-            // en este navegador y, de ser así, refleja el estado real en el
-            // botón en vez de mostrar siempre "Activar" tras recargar.
-            if (window._sincronizarBotonPushAdmin) window._sincronizarBotonPushAdmin();
           } catch(e) {
             console.warn('⚠️ No se pudo leer el rol, asumiendo super:', e);
             _aplicarRestriccionesRol('super');
@@ -4770,17 +4673,6 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
 
       const refrescarBtn = document.getElementById('iaAdminRefrescarBtn');
       if (refrescarBtn) refrescarBtn.addEventListener('click', refrescarPapeleraIAAdmin);
-
-      const activarPushBtn = document.getElementById('iaAdminActivarPushBtn');
-      if (activarPushBtn) activarPushBtn.addEventListener('click', async function () {
-        activarPushBtn.disabled = true;
-        const ok = await window.activarNotificacionesAdminPush();
-        activarPushBtn.disabled = false;
-        if (ok) {
-          activarPushBtn.textContent = '🔔 Notificaciones activadas';
-          activarPushBtn.style.color = '#22C55E';
-        }
-      });
     });
   })();
   // ┌─────────────────────────────────────────────────────────┐
@@ -11346,11 +11238,6 @@ window.subirBarriosFirebase = async function() {
     </button>
     <button id="iaAdminRefrescarBtn" type="button" title="Refrescar alertas no vistas" style="background:var(--surface2);color:var(--text-2);border:1px solid var(--border);padding:10px 12px;border-radius:10px;cursor:pointer;font-size:15px;flex-shrink:0;">🔄</button>
   </div>
-
-  <!-- ── NOTIFICACIONES PUSH (celular/panel cerrado) ──────── -->
-  <button id="iaAdminActivarPushBtn" type="button" style="width:100%;margin-bottom:10px;background:var(--surface2);color:var(--text-1);border:1px solid var(--border);padding:9px 14px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;">
-    🔔 Activar notificaciones con el panel cerrado
-  </button>
 
   <div id="iaAdminPapeleraPanel" style="display:none;margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px;max-height:260px;overflow-y:auto;">
     <div id="iaAdminPapeleraLista" style="display:flex;flex-direction:column;gap:8px;"></div>
