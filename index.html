@@ -5082,7 +5082,13 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       items.sort((a, b) => (a.timestampCreacion || 0) - (b.timestampCreacion || 0)); // el más viejo sin atender, arriba
 
       const totalOnline = Object.values(window._repartidoresInfoHistorial || {}).filter(r => r && r.online === true).length;
-      const sinRepartidor = items.filter(p => !p.repartidorIdAsignado).length;
+      // FIX 2026-08-25: el pedido guarda el repartidor asignado bajo distintos
+      // nombres de campo según el flujo que lo creó (repartidorIdAsignado,
+      // repartidorUID o repartidorId) — antes solo se revisaba
+      // repartidorIdAsignado, así que pedidos asignados por otro flujo se
+      // veían "Sin repartidor" aunque sí tuvieran uno. Ahora se revisan los tres.
+      const tieneRepartidor = (p) => !!(p.repartidorIdAsignado || p.repartidorUID || p.repartidorId);
+      const sinRepartidor = items.filter(p => !tieneRepartidor(p)).length;
       const elCon = document.getElementById('piv-conectados');
       const elAct = document.getElementById('piv-activos');
       const elSin = document.getElementById('piv-sin-repartidor');
@@ -5103,7 +5109,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       cont.innerHTML = items.map(p => {
         const estadoClass = normalizeEstadoClass(p.estado);
         const colores = PIV_COLOR[estadoClass] || PIV_COLOR['pendiente'];
-        const sinRep = !p.repartidorIdAsignado;
+        const sinRep = !tieneRepartidor(p);
         const nombreCliente = p.nombreCliente || 'Sin nombre';
         const direccion = p.direccionCliente || 'Sin dirección';
         const repTexto = sinRep ? '⚠️ Sin repartidor asignado' : `🛵 ${p.repartidorNombre || 'Repartidor asignado'}`;
