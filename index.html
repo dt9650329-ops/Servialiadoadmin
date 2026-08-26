@@ -5110,7 +5110,8 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
         const estadoClass = normalizeEstadoClass(p.estado);
         const colores = PIV_COLOR[estadoClass] || PIV_COLOR['pendiente'];
         const sinRep = !tieneRepartidor(p);
-        const nombreCliente = p.nombreCliente || 'Sin nombre';
+        const nombreCliente = p.nombreCliente || p.nombreRecibe || 'Sin nombre';
+        const nombreTienda = p.nombreEntrega || null;
         const direccion = p.direccionCliente || 'Sin dirección';
         const repTexto = sinRep ? '⚠️ Sin repartidor asignado' : `🛵 ${p.repartidorNombre || 'Repartidor asignado'}`;
         return `
@@ -5119,6 +5120,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
               <strong style="color:var(--text-1);font-size:14px;">${nombreCliente}</strong>
               <span style="background:${colores.border};color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">${colores.label}</span>
             </div>
+            ${nombreTienda ? `<div style="color:var(--text-3);font-size:12px;margin-top:2px;">🏪 ${nombreTienda}</div>` : ''}
             <div style="color:var(--text-2);font-size:13px;margin-top:4px;">📍 ${direccion}</div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:6px;">
               <span style="color:${sinRep ? '#F97316' : 'var(--text-3)'};font-size:12px;font-weight:${sinRep ? '700' : '400'};">${repTexto}</span>
