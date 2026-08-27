@@ -7237,6 +7237,10 @@ return alert("Error: El pedido original no se encontró.");
     try {
       await update(dbRef(db, 'negocios/' + negocioId), {
         aprobado: true,
+        estado: 'aprobado', // ✅ FIX: antes solo se actualizaba "aprobado" (booleano),
+                             // nunca "estado" — por eso la tienda se mostraba a los
+                             // demás clientes pero al dueño le seguía apareciendo
+                             // el badge "Pendiente" (lee el campo "estado").
         fechaAprobacion: Date.now()
       });
       alert('✅ Tienda aprobada exitosamente. Ahora aparecerá en la app del cliente.');
@@ -7254,6 +7258,8 @@ return alert("Error: El pedido original no se encontró.");
     try {
       await update(dbRef(db, 'negocios/' + negocioId), {
         aprobado: false,
+        estado: 'rechazado', // ✅ FIX: mismo motivo — mantener "estado" sincronizado
+                              // con "aprobado" para que el badge del dueño sea correcto.
         fechaRechazo: Date.now()
       });
       alert('⏸️ Tienda desaprobada. Ya no aparecerá en la app del cliente.');
