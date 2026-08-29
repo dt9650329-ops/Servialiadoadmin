@@ -4469,7 +4469,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
         _renderPapeleraIAAdmin();
       } catch (e) {
         console.error('❌ Error marcando alertas como leídas:', e);
-        alert('No se pudo marcar las alertas como leídas. Intenta de nuevo.');
+        alert('No se pudo marcar las alertas como leídas' + (e && e.message ? ': ' + e.message : '') + '. Intenta de nuevo.');
       }
     }
 
