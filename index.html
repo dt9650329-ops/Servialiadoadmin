@@ -4322,6 +4322,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       if (targetTab === 'monitoreoSection') {
           if (window._iniciarMonitoreoServidor) window._iniciarMonitoreoServidor();
           if (window._iniciarMonitoreoRepartidores) window._iniciarMonitoreoRepartidores();
+          if (window._iniciarMonitoreoUbicacion) window._iniciarMonitoreoUbicacion();
       }
       if (targetTab !== 'clientes') {
           window.volverAlista(); 
@@ -9468,8 +9469,14 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
     </div>
 
     <h3 style="font-size:14px;margin:0 0 8px;color:var(--text-1);">📋 Historial reciente</h3>
-    <div id="monrep-log" style="display:flex;flex-direction:column;gap:8px;max-width:700px;">
+    <div id="monrep-log" style="display:flex;flex-direction:column;gap:8px;max-width:700px;margin-bottom:22px;">
       <p style="color:var(--text-3);text-align:center;padding:20px;">Sin eventos todavía.</p>
+    </div>
+
+    <h3 style="font-size:14px;margin:0 0 4px;color:var(--text-1);">📍 Ubicación GPS (en línea)</h3>
+    <p style="color:var(--text-3);font-size:12px;margin:0 0 10px;">Repartidores marcados "en servicio" que dejaron de enviar su posición hace más de 3 minutos — puede indicar GPS caído, app congelada o celular apagado.</p>
+    <div id="monrep-ubicacion-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;max-width:900px;">
+      <p style="color:var(--text-3);text-align:center;padding:20px;grid-column:1/-1;">Cargando...</p>
     </div>
   </div>
 
@@ -11533,7 +11540,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // 🩺 SUB-PESTAÑAS DE MONITOREO (Servidor / Repartidores / Clientes)
 // Y BADGE COMBINADO en la pestaña principal "Monitoreo" del menú.
 // ══════════════════════════════════════════════════════════════
-window._monFailCounts = { servidor: 0, repartidores: 0, clientes: 0 };
+window._monFailCounts = { servidor: 0, repartidores: 0, clientes: 0, ubicacion: 0 };
 window._actualizarBadgeMonitoreoGeneral = function() {
   const total = Object.values(window._monFailCounts).reduce((a, b) => a + b, 0);
   const badge = document.getElementById('badge-monitoreo-alerta');
@@ -11543,7 +11550,10 @@ window._actualizarBadgeMonitoreoGeneral = function() {
   }
   ['servidor', 'repartidores', 'clientes'].forEach(k => {
     const dot = document.getElementById('mon-dot-' + k);
-    if (dot) dot.style.display = window._monFailCounts[k] > 0 ? 'inline-block' : 'none';
+    if (!dot) return;
+    let count = window._monFailCounts[k] || 0;
+    if (k === 'repartidores') count += (window._monFailCounts.ubicacion || 0);
+    dot.style.display = count > 0 ? 'inline-block' : 'none';
   });
 };
 
@@ -11669,9 +11679,11 @@ document.querySelectorAll('.mon-subtab-btn').forEach(btn => {
 (function() {
 
   const SECCIONES_DEF = {
-    chats:   { label: 'Chats (mensajes, fotos, audios)', icon: '💬' },
-    pedidos: { label: 'Pedidos (aceptar/cancelar/estado/ruta)', icon: '📦' },
-    sos:     { label: 'S.O.S', icon: '🆘' },
+    chats:         { label: 'Chats (mensajes, fotos, audios)', icon: '💬' },
+    pedidos:       { label: 'Pedidos (aceptar/cancelar/estado/ruta)', icon: '📦' },
+    sos:           { label: 'S.O.S', icon: '🆘' },
+    sesion:        { label: 'Sesión (cierres inesperados)', icon: '🔐' },
+    notificaciones:{ label: 'Notificaciones (sonido/push)', icon: '🔔' },
   };
 
   const VENTANA_24H_MS = 24 * 60 * 60 * 1000;
@@ -11774,6 +11786,75 @@ document.querySelectorAll('.mon-subtab-btn').forEach(btn => {
     const panel = document.getElementById('monitoreo-panel-repartidores');
     if (panel && panel.classList.contains('active')) render();
   }, 60000);
+
+})();
+
+// ══════════════════════════════════════════════════════════════
+// 📍 MÓDULO: MONITOREO DE UBICACIÓN GPS (heartbeat, solo lectura)
+// Firebase: repartidores_info/{uid} = { online, trackingActivo, lastSeen, nombre, ... }
+// A diferencia de chats/pedidos/S.O.S (que dependen de que el repartidor
+// reporte SU PROPIO error), esto se calcula del lado del admin: si un
+// repartidor sigue marcado "online"/"trackingActivo" pero su lastSeen ya
+// quedó viejo, es la señal de que dejó de mandar ubicación — sin depender
+// de que su app se dé cuenta sola de la falla.
+// ══════════════════════════════════════════════════════════════
+(function() {
+
+  const UMBRAL_STALE_MS = 3 * 60 * 1000; // 3 minutos sin reportar
+
+  let _repartidoresData = {};
+
+  function render() {
+    const cont = document.getElementById('monrep-ubicacion-lista');
+    if (!cont) return;
+    const ahora = Date.now();
+    const enLinea = Object.entries(_repartidoresData).filter(([, r]) => r && (r.online || r.trackingActivo));
+    if (!enLinea.length) {
+      cont.innerHTML = '<p style="color:var(--text-3);text-align:center;padding:20px;grid-column:1/-1;">Ningún repartidor en línea ahora mismo.</p>';
+      window._monFailCounts.ubicacion = 0;
+      window._actualizarBadgeMonitoreoGeneral();
+      return;
+    }
+    let failCount = 0;
+    cont.innerHTML = enLinea.map(([uid, r]) => {
+      const lastSeen = r.lastSeen || 0;
+      const segsSinReportar = Math.round((ahora - lastSeen) / 1000);
+      const stale = (ahora - lastSeen) > UMBRAL_STALE_MS;
+      if (stale) failCount++;
+      const color = stale ? '#EF4444' : '#10B981';
+      const texto = stale ? `⚠️ Sin señal hace ${segsSinReportar}s` : `Reportando (hace ${segsSinReportar}s)`;
+      return `
+        <div style="background:var(--surface2);border:1px solid var(--border);border-left:4px solid ${color};border-radius:10px;padding:12px 14px;">
+          <div style="font-weight:600;font-size:13px;color:var(--text-1);margin-bottom:4px;">${r.nombre || 'Repartidor'}</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};"></span>
+            <span style="font-size:12px;color:${color};font-weight:600;">${texto}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+    window._monFailCounts.ubicacion = failCount;
+    window._actualizarBadgeMonitoreoGeneral();
+  }
+
+  let _listenerActivo = false;
+  window._iniciarMonitoreoUbicacion = function() {
+    if (_listenerActivo) return;
+    _listenerActivo = true;
+    window.dbOnValue(window.dbRef(window.db, 'repartidores_info'), (snap) => {
+      _repartidoresData = snap.exists() ? snap.val() : {};
+      render();
+    }, (error) => {
+      console.error('Error al escuchar repartidores_info (ubicación):', error);
+    });
+  };
+
+  // Recalcula cada 30s aunque no llegue dato nuevo, para que "hace Ns"
+  // y el estado "sin señal" se actualicen solos con el paso del tiempo.
+  setInterval(() => {
+    const panel = document.getElementById('monitoreo-panel-repartidores');
+    if (panel && panel.classList.contains('active')) render();
+  }, 30000);
 
 })();
 
