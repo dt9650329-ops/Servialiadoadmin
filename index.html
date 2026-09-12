@@ -2123,6 +2123,7 @@ section h2 strong, section h2 span { color: var(--accent); }
     <button class="tab-btn" data-tab="fondoCreditosSection"><span class="tab-icon">💰</span> Fondo de Créditos</button>
     <button class="tab-btn" data-tab="historialPedidos"><span class="tab-icon">📚</span> Historial</button>
     <button class="tab-btn" data-tab="mapaRepartidores"><span class="tab-icon">🗺️</span> Mapa</button>
+    <button class="tab-btn" id="tabMonitoreo" data-tab="monitoreoSection"><span class="tab-icon">🩺</span> Monitoreo <span id="badge-monitoreo-alerta" style="display:none;background:#EF4444;color:#fff;border-radius:20px;padding:2px 7px;font-size:11px;margin-left:auto;font-weight:700;min-width:18px;text-align:center;">0</span></button>
     <button class="tab-btn" id="tabAsistenteIA" data-tab="asistenteIASection" style="border-left:3px solid #8B5CF6;">
       <span class="tab-icon">🤖</span> Asistente IA
     </button>
@@ -4317,6 +4318,10 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       }
       if (targetTab === 'tarifasClienteSection' && window._cargarTarifasCliente) {
           window._cargarTarifasCliente();
+      }
+      if (targetTab === 'monitoreoSection') {
+          if (window._iniciarMonitoreoServidor) window._iniciarMonitoreoServidor();
+          if (window._iniciarMonitoreoRepartidores) window._iniciarMonitoreoRepartidores();
       }
       if (targetTab !== 'clientes') {
           window.volverAlista(); 
@@ -9389,6 +9394,92 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
 </section>
 
 <!-- ╔═══════════════════════════════════════════════════════╗
+     ║ [HTML-MONITOREO] SECCIÓN: MONITOREO (Servidor / Repartidores / Clientes) ║
+     ╚═══════════════════════════════════════════════════════╝ -->
+<section id="monitoreoSection">
+  <h2 style="margin-top:0;margin-bottom:4px;">🩺 Monitoreo</h2>
+  <p style="color:var(--text-3);font-size:13px;margin:0 0 14px;">Estado en vivo de la plataforma: salud del servidor y errores reales capturados en las apps de repartidor y cliente.</p>
+
+  <!-- Sub-pestañas internas -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:12px;">
+    <button class="mon-subtab-btn active" data-monsub="servidor"><span>🖥️</span> Servidor <span class="mon-dot" id="mon-dot-servidor" style="display:none;"></span></button>
+    <button class="mon-subtab-btn" data-monsub="repartidores"><span>🛵</span> Repartidores <span class="mon-dot" id="mon-dot-repartidores" style="display:none;"></span></button>
+    <button class="mon-subtab-btn" data-monsub="clientes"><span>🧑</span> Clientes <span class="mon-dot" id="mon-dot-clientes" style="display:none;"></span></button>
+  </div>
+  <style>
+    .mon-subtab-btn {
+      display:flex; align-items:center; gap:6px;
+      background:var(--surface2); border:1px solid var(--border); border-radius:20px;
+      padding:7px 14px; font-size:12px; font-weight:600; color:var(--text-2);
+      cursor:pointer; transition:var(--transition);
+    }
+    .mon-subtab-btn:hover { color:var(--text); }
+    .mon-subtab-btn.active { color:var(--accent); background:var(--accent-dim); border-color:var(--accent); }
+    .mon-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#EF4444; }
+    .mon-panel { display:none; }
+    .mon-panel.active { display:block; }
+  </style>
+
+  <!-- ── Panel: SERVIDOR ── -->
+  <div id="monitoreo-panel-servidor" class="mon-panel active">
+    <p style="color:var(--text-3);font-size:12px;margin:0 0 14px;">Una Cloud Function programada (verificarEstadoSistema) revisa cada 5 minutos y guarda el resultado; esta pantalla solo lee ese resultado, no hace la revisión ella misma.</p>
+
+    <div id="monitoreo-resumen" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+      <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:12px 18px;min-width:120px;">
+        <div style="color:var(--text-3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">🟢 Funcionando</div>
+        <div id="monitoreo-ok-count" style="color:#10b981;font-size:22px;font-weight:700;">-</div>
+      </div>
+      <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px 18px;min-width:120px;">
+        <div style="color:var(--text-3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">🔴 Con problemas</div>
+        <div id="monitoreo-fail-count" style="color:#EF4444;font-size:22px;font-weight:700;">-</div>
+      </div>
+    </div>
+
+    <!-- Leyenda de colores -->
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;color:var(--text-3);">
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10B981;margin-right:4px;"></span>Funcionando</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#EF4444;margin-right:4px;"></span>Con problemas</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#F59E0B;margin-right:4px;"></span>Sin reportar (posible caída del chequeo)</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#6B7280;margin-right:4px;"></span>Sin datos todavía</span>
+    </div>
+
+    <div id="monitoreo-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;max-width:900px;">
+      <p style="color:var(--text-3);text-align:center;padding:30px;grid-column:1/-1;">Cargando estado del sistema...</p>
+    </div>
+  </div>
+
+  <!-- ── Panel: REPARTIDORES ── -->
+  <div id="monitoreo-panel-repartidores" class="mon-panel">
+    <p style="color:var(--text-3);font-size:12px;margin:0 0 14px;">Errores reales capturados en la app del repartidor (chats, pedidos y S.O.S). Cada tarjeta muestra el último error de esa sección; abajo, el historial reciente.</p>
+
+    <div id="monrep-resumen" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+      <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:12px 18px;min-width:120px;">
+        <div style="color:var(--text-3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">🟢 Sin errores (24h)</div>
+        <div id="monrep-ok-count" style="color:#10b981;font-size:22px;font-weight:700;">-</div>
+      </div>
+      <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px 18px;min-width:120px;">
+        <div style="color:var(--text-3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">🔴 Con errores (24h)</div>
+        <div id="monrep-fail-count" style="color:#EF4444;font-size:22px;font-weight:700;">-</div>
+      </div>
+    </div>
+
+    <div id="monrep-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;max-width:900px;margin-bottom:22px;">
+      <p style="color:var(--text-3);text-align:center;padding:30px;grid-column:1/-1;">Cargando monitoreo de repartidores...</p>
+    </div>
+
+    <h3 style="font-size:14px;margin:0 0 8px;color:var(--text-1);">📋 Historial reciente</h3>
+    <div id="monrep-log" style="display:flex;flex-direction:column;gap:8px;max-width:700px;">
+      <p style="color:var(--text-3);text-align:center;padding:20px;">Sin eventos todavía.</p>
+    </div>
+  </div>
+
+  <!-- ── Panel: CLIENTES (próximamente) ── -->
+  <div id="monitoreo-panel-clientes" class="mon-panel">
+    <p style="color:var(--text-3);text-align:center;padding:30px;">🚧 Próximamente: monitoreo de errores del lado del cliente (index.html).</p>
+  </div>
+</section>
+
+<!-- ╔═══════════════════════════════════════════════════════╗
      ║ [HTML-CONEXIONES] SECCIÓN: CONEXIONES REPARTIDORES    ║
      ╚═══════════════════════════════════════════════════════╝ -->
 <!-- ==================== SECCIÓN: CONEXIONES ==================== -->
@@ -11437,6 +11528,254 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (window.innerWidth <= 768) closeSidebar();
   });
 });
+
+// ══════════════════════════════════════════════════════════════
+// 🩺 SUB-PESTAÑAS DE MONITOREO (Servidor / Repartidores / Clientes)
+// Y BADGE COMBINADO en la pestaña principal "Monitoreo" del menú.
+// ══════════════════════════════════════════════════════════════
+window._monFailCounts = { servidor: 0, repartidores: 0, clientes: 0 };
+window._actualizarBadgeMonitoreoGeneral = function() {
+  const total = Object.values(window._monFailCounts).reduce((a, b) => a + b, 0);
+  const badge = document.getElementById('badge-monitoreo-alerta');
+  if (badge) {
+    if (total > 0) { badge.style.display = 'inline-block'; badge.textContent = total; }
+    else { badge.style.display = 'none'; }
+  }
+  ['servidor', 'repartidores', 'clientes'].forEach(k => {
+    const dot = document.getElementById('mon-dot-' + k);
+    if (dot) dot.style.display = window._monFailCounts[k] > 0 ? 'inline-block' : 'none';
+  });
+};
+
+document.querySelectorAll('.mon-subtab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mon-subtab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.mon-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('monitoreo-panel-' + btn.dataset.monsub).classList.add('active');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// 🩺 MÓDULO: MONITOREO DEL SERVIDOR (solo lectura)
+// Firebase: estado_sistema/{servicio} = { ok, latenciaMs, ultimoCheck, detalle }
+// Esos datos los escribe la Cloud Function programada verificarEstadoSistema
+// (cada 5 min, en functions/index.js) — este módulo solo escucha y pinta,
+// nunca escribe nada él mismo.
+// ══════════════════════════════════════════════════════════════
+(function() {
+
+  const SERVICIOS_DEF = {
+    firebase_database: { label: 'Base de datos (Firebase)',    icon: '🗄️' },
+    cloud_functions:    { label: 'Cloud Functions',             icon: '⚙️' },
+    nominatim:          { label: 'Geocodificación (Nominatim)', icon: '📍' },
+    gemini:             { label: 'IA / ServiBot (Gemini)',      icon: '🤖' },
+  };
+
+  // 3x el intervalo real de la Cloud Function (5 min): si no ha reportado
+  // en ese tiempo, algo le pasó al propio chequeo (no solo al servicio).
+  const UMBRAL_DESACTUALIZADO_MS = 15 * 60 * 1000;
+
+  function render(data) {
+    const cont = document.getElementById('monitoreo-lista');
+    if (!cont) return;
+    data = data || {};
+    let okCount = 0, failCount = 0;
+    cont.innerHTML = '';
+    Object.keys(SERVICIOS_DEF).forEach(key => {
+      const def = SERVICIOS_DEF[key];
+      const info = data[key] || null;
+      let color = '#6B7280', texto = 'Sin datos todavía', sub = '';
+      if (info) {
+        const desactualizado = (Date.now() - (info.ultimoCheck || 0)) > UMBRAL_DESACTUALIZADO_MS;
+        if (desactualizado) {
+          color = '#F59E0B';
+          texto = 'Sin reportar (posible caída del chequeo)';
+        } else if (info.ok) {
+          color = '#10B981';
+          texto = 'Funcionando';
+          okCount++;
+        } else {
+          color = '#EF4444';
+          texto = 'Con problemas';
+          failCount++;
+        }
+        const fecha = info.ultimoCheck ? new Date(info.ultimoCheck).toLocaleTimeString('es-CO') : '-';
+        sub = `Últ. chequeo: ${fecha}` +
+              (info.latenciaMs != null ? ` · ${info.latenciaMs}ms` : '') +
+              (info.detalle && !info.ok ? ` · ${info.detalle}` : '');
+      } else {
+        failCount++; // sin datos cuenta como "con problemas" en el resumen
+      }
+      const card = document.createElement('div');
+      card.style.cssText = `background:var(--surface2);border:1px solid var(--border);border-left:4px solid ${color};border-radius:10px;padding:12px 14px;`;
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="font-size:16px;">${def.icon}</span>
+          <span style="font-weight:600;font-size:13px;color:var(--text-1);">${def.label}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};"></span>
+          <span style="font-size:12px;color:${color};font-weight:600;">${texto}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);">${sub}</div>
+      `;
+      cont.appendChild(card);
+    });
+    const okEl = document.getElementById('monitoreo-ok-count');
+    const failEl = document.getElementById('monitoreo-fail-count');
+    if (okEl) okEl.textContent = okCount;
+    if (failEl) failEl.textContent = failCount;
+
+    // Badge combinado en el botón del menú lateral si algo está mal
+    window._monFailCounts.servidor = failCount;
+    window._actualizarBadgeMonitoreoGeneral();
+  }
+
+  let _listenerActivo = false;
+  window._iniciarMonitoreoServidor = function() {
+    if (_listenerActivo) return;
+    _listenerActivo = true;
+    window.dbOnValue(window.dbRef(window.db, 'estado_sistema'), (snap) => {
+      render(snap.exists() ? snap.val() : {});
+    }, (error) => {
+      console.error('Error al escuchar estado_sistema:', error);
+      const cont = document.getElementById('monitoreo-lista');
+      if (cont) cont.innerHTML = '<p style="color:var(--danger);text-align:center;padding:20px;grid-column:1/-1;">No se pudo cargar el estado del sistema.</p>';
+    });
+  };
+
+  // Vuelve a pintar cada 30s aunque Firebase no mande nada nuevo, para que
+  // el estado "amarillo" (desactualizado) aparezca solo con el paso del
+  // tiempo y no solo cuando llega un dato nuevo.
+  setInterval(() => {
+    const sec = document.getElementById('monitoreoSection');
+    if (sec && sec.classList.contains('active') && window.db) {
+      window.dbGet(window.dbRef(window.db, 'estado_sistema')).then(snap => {
+        render(snap.exists() ? snap.val() : {});
+      }).catch(() => {});
+    }
+  }, 30000);
+
+})();
+
+// ══════════════════════════════════════════════════════════════
+// 🛵 MÓDULO: MONITOREO REPARTIDORES (solo lectura)
+// Firebase: monitoreo_repartidor/{seccion}/ultimoError = { funcion, error, codigo, extra, repartidorUID, repartidorNombre, ts }
+// Firebase: monitoreo_repartidor_log/{seccion}/{pushId} = mismo shape, uno por evento
+// Esos datos los escribe indexrepartidor.html cuando algo falla de verdad
+// (chats, pedidos, S.O.S) — este módulo solo escucha y pinta.
+// ══════════════════════════════════════════════════════════════
+(function() {
+
+  const SECCIONES_DEF = {
+    chats:   { label: 'Chats (mensajes, fotos, audios)', icon: '💬' },
+    pedidos: { label: 'Pedidos (aceptar/cancelar/estado/ruta)', icon: '📦' },
+    sos:     { label: 'S.O.S', icon: '🆘' },
+  };
+
+  const VENTANA_24H_MS = 24 * 60 * 60 * 1000;
+
+  let _ultimoErrorPorSeccion = {};
+  let _logPorSeccion = {};
+
+  function _formatearFecha(ts) {
+    return ts ? new Date(ts).toLocaleString('es-CO', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '-';
+  }
+
+  function render() {
+    const cont = document.getElementById('monrep-lista');
+    if (!cont) return;
+    const ahora = Date.now();
+    let okCount = 0, failCount = 0;
+    cont.innerHTML = '';
+    Object.keys(SECCIONES_DEF).forEach(seccion => {
+      const def = SECCIONES_DEF[seccion];
+      const ultimo = _ultimoErrorPorSeccion[seccion] || null;
+      const eventos = Object.values(_logPorSeccion[seccion] || {});
+      const errores24h = eventos.filter(ev => (ahora - (ev.ts || 0)) <= VENTANA_24H_MS).length;
+      let color, texto;
+      if (errores24h > 0) { color = '#EF4444'; texto = `${errores24h} error(es) en 24h`; failCount++; }
+      else { color = '#10B981'; texto = 'Sin errores en 24h'; okCount++; }
+      const card = document.createElement('div');
+      card.style.cssText = `background:var(--surface2);border:1px solid var(--border);border-left:4px solid ${color};border-radius:10px;padding:12px 14px;`;
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="font-size:16px;">${def.icon}</span>
+          <span style="font-weight:600;font-size:13px;color:var(--text-1);">${def.label}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};"></span>
+          <span style="font-size:12px;color:${color};font-weight:600;">${texto}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);">
+          ${ultimo ? `Últ.: "${ultimo.funcion}" — ${ultimo.error} · ${ultimo.repartidorNombre || '—'} · ${_formatearFecha(ultimo.ts)}` : 'Sin errores registrados todavía'}
+        </div>
+      `;
+      cont.appendChild(card);
+    });
+    const okEl = document.getElementById('monrep-ok-count');
+    const failEl = document.getElementById('monrep-fail-count');
+    if (okEl) okEl.textContent = okCount;
+    if (failEl) failEl.textContent = failCount;
+
+    // Badge combinado en el botón del menú lateral
+    window._monFailCounts.repartidores = failCount;
+    window._actualizarBadgeMonitoreoGeneral();
+
+    // Historial combinado (últimos 30 eventos de todas las secciones)
+    const logCont = document.getElementById('monrep-log');
+    if (logCont) {
+      let todos = [];
+      Object.keys(SECCIONES_DEF).forEach(seccion => {
+        Object.values(_logPorSeccion[seccion] || {}).forEach(ev => todos.push({ ...ev, seccion }));
+      });
+      todos.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      todos = todos.slice(0, 30);
+      if (!todos.length) {
+        logCont.innerHTML = '<p style="color:var(--text-3);text-align:center;padding:20px;">Sin eventos todavía.</p>';
+      } else {
+        logCont.innerHTML = todos.map(ev => `
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;">
+            <div style="color:var(--text-1);font-weight:600;">${SECCIONES_DEF[ev.seccion].icon} ${ev.funcion} <span style="color:var(--text-3);font-weight:400;">(${ev.seccion})</span></div>
+            <div style="color:#EF4444;">${ev.error}</div>
+            <div style="color:var(--text-3);">${ev.repartidorNombre || '—'} · ${_formatearFecha(ev.ts)}</div>
+          </div>
+        `).join('');
+      }
+    }
+  }
+
+  let _listenerActivo = false;
+  window._iniciarMonitoreoRepartidores = function() {
+    if (_listenerActivo) return;
+    _listenerActivo = true;
+    window.dbOnValue(window.dbRef(window.db, 'monitoreo_repartidor'), (snap) => {
+      const data = snap.exists() ? snap.val() : {};
+      _ultimoErrorPorSeccion = {};
+      Object.keys(data).forEach(seccion => { _ultimoErrorPorSeccion[seccion] = data[seccion].ultimoError || null; });
+      render();
+    }, (error) => {
+      console.error('Error al escuchar monitoreo_repartidor:', error);
+    });
+    window.dbOnValue(window.dbRef(window.db, 'monitoreo_repartidor_log'), (snap) => {
+      _logPorSeccion = snap.exists() ? snap.val() : {};
+      render();
+    }, (error) => {
+      console.error('Error al escuchar monitoreo_repartidor_log:', error);
+      const cont = document.getElementById('monrep-lista');
+      if (cont) cont.innerHTML = '<p style="color:var(--danger);text-align:center;padding:20px;grid-column:1/-1;">No se pudo cargar el monitoreo de repartidores.</p>';
+    });
+  };
+
+  // Recalcula cada 60s aunque no llegue dato nuevo, para que la ventana de
+  // "errores en 24h" se vaya vaciando sola con el paso del tiempo.
+  setInterval(() => {
+    const panel = document.getElementById('monitoreo-panel-repartidores');
+    if (panel && panel.classList.contains('active')) render();
+  }, 60000);
+
+})();
 
 // ══════════════════════════════════════════════════════════════
 // MÓDULO: ADMINISTRADORES (solo Super Admin)
