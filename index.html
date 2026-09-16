@@ -4550,6 +4550,22 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
         }
         pintarMensajeIAAdmin(m.content, m.role === 'user', m.esAlerta === true);
 
+        // 🆕 Si la herramienta abrirFormularioAgregarBarrio se activó en el
+        // backend, el mensaje trae accion:'agregarBarrio' — se abre el mismo
+        // modal "Agregar Barrio / Conjunto" que ya usa el botón de la
+        // pestaña de ubicaciones (con su propio mapa y su propio guardado a
+        // Firebase), prellenando el nombre si Gemini lo detectó.
+        if (m.accion === 'agregarBarrio' && typeof window.abrirModalAgregarBarrio === 'function') {
+          window.abrirModalAgregarBarrio();
+          const nombreSugerido = m.datosAccion && m.datosAccion.nombreSugerido;
+          if (nombreSugerido) {
+            setTimeout(function () {
+              const inp = document.getElementById('nuevo-barrio-nombre');
+              if (inp) inp.value = nombreSugerido;
+            }, 250);
+          }
+        }
+
         if (m.esAlerta === true && m.leida === false) {
           _alertasNoLeidasIAAdmin.set(key, { texto: m.content, ts: m.ts || Date.now() });
           _renderPapeleraIAAdmin();
