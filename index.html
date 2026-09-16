@@ -9162,6 +9162,18 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
     </div>
   </div>
 
+
+  <div id="stats-barrios" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
+  <div id="tabla-barrios-admin" style="background:#222;border-radius:10px;overflow:hidden;max-height:600px;overflow-y:auto;"></div>
+</section>
+
+<!-- 🔧 FIX 2026-09-16: modal-agregar-barrio movido fuera de <section id="barriosSection">.
+     Antes vivía DENTRO de esa sección, así que cuando el admin estaba en otra pestaña
+     (ej. el chat del Asistente IA) la sección padre tenía display:none y el modal, aunque
+     fuera position:fixed, nunca se pintaba — un ancestro display:none oculta a todos sus
+     descendientes sin importar su propio position/z-index. Por eso abrirModalAgregarBarrio()
+     (llamado también desde el chat IA cuando Gemini usa la herramienta
+     abrirFormularioAgregarBarrio) solo se veía si ya estabas en la pestaña de Ubicaciones. -->
   <!-- MODAL AGREGAR BARRIO CON MAPA -->
   <div id="modal-agregar-barrio" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;flex-direction:column;">
     <div style="display:flex;flex-direction:column;height:100%;">
@@ -9245,9 +9257,6 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
     </div>
   </div>
 
-  <div id="stats-barrios" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
-  <div id="tabla-barrios-admin" style="background:#222;border-radius:10px;overflow:hidden;max-height:600px;overflow-y:auto;"></div>
-</section>
 
 <!-- ╔═══════════════════════════════════════════════════════╗
      ║ [HTML-TARIFAS] SECCIÓN: TARIFAS PREFERENCIALES        ║
