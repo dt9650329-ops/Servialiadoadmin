@@ -4527,6 +4527,16 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       if (!window.db || !window.dbRef || !window.dbQuery || !window.dbOrderByChild || !window.dbStartAt || !window.dbOnChildAdded) return;
       window._chatIAAdminListenerActivo = true;
 
+      // 🔧 FIX 2026-09-16: marca de tiempo del momento en que se engancha el
+      // listener. onChildAdded siempre "reproduce" primero TODOS los
+      // mensajes existentes de las últimas 24h (ver comentario más abajo) y
+      // los trata igual que un mensaje nuevo — así que sin este corte, un
+      // mensaje viejo con accion:'agregarBarrio' reabre el modal cada vez
+      // que se recarga la página, mientras esa prueba siga dentro de la
+      // ventana de 24h. Solo los mensajes con ts posterior a este momento
+      // se consideran "en vivo" para efectos como abrir el modal.
+      const tsInicioListenerIAAdmin = Date.now();
+
       const hace24h = Date.now() - 24 * 60 * 60 * 1000;
       const q = window.dbQuery(
         window.dbRef(window.db, 'admin_chat_historial'),
@@ -4555,7 +4565,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
         // modal "Agregar Barrio / Conjunto" que ya usa el botón de la
         // pestaña de ubicaciones (con su propio mapa y su propio guardado a
         // Firebase), prellenando el nombre si Gemini lo detectó.
-        if (m.accion === 'agregarBarrio' && typeof window.abrirModalAgregarBarrio === 'function') {
+        if (m.accion === 'agregarBarrio' && (m.ts || 0) >= tsInicioListenerIAAdmin && typeof window.abrirModalAgregarBarrio === 'function') {
           window.abrirModalAgregarBarrio();
           const nombreSugerido = m.datosAccion && m.datosAccion.nombreSugerido;
           if (nombreSugerido) {
