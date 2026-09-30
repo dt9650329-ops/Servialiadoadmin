@@ -2467,6 +2467,23 @@ section h2 strong, section h2 span { color: var(--accent); }
 <audio id="notificationSoundRepartidor" src="https://github.com/dt9650329-ops/Chat-administrador-/raw/f67a159f93aed6be1d6f7f02709384111cd84b7e/%E2%9C%A8Monedas%20Cayendo%20__%20Efectos%20De%20Sonidos%20(MP3_160K).mp3" preload="auto"></audio> 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Capa de mapa estilo Mapbox Light (usada por los 3 mapas del admin) -->
+<script>
+  // 👉 Pega aquí tu token público de Mapbox (empieza por "pk.")
+  window.MAPBOX_TOKEN = 'pk.eyJ1IjoiZGllZ29mdG9ycmVzYSIsImEiOiJjbXVvOWpjNjIwMGF2MndvZ216d3U5dnQ5In0.B0O9sdv3P-VInWD3ZcsnuQ';
+  (function(){var st=document.createElement('style');st.textContent='.leaflet-tile-pane{filter:saturate(.8)}';document.head.appendChild(st);})(); window.crearCapaMapbox = function () {
+    if (!window.MAPBOX_TOKEN || window.MAPBOX_TOKEN.indexOf('pk.') !== 0) {
+      console.warn('⚠️ Sin token de Mapbox: usando OpenStreetMap de respaldo');
+      return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors', maxZoom: 19
+      });
+    }
+    return L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=' + window.MAPBOX_TOKEN, {
+      tileSize: 512, zoomOffset: -1, maxZoom: 19,
+      attribution: '© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    });
+  };
+</script>
 <script type="module">
   // ┌─────────────────────────────────────────────────────────┐
   // │ [JS-01] IMPORTS DE FIREBASE                             │
@@ -2758,10 +2775,7 @@ section h2 strong, section h2 span { color: var(--accent); }
       if (mapInitialized) return;
       const armeniaCoords = [4.5339, -75.6811];
       map = L.map('map').setView(armeniaCoords, 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors',
-          maxZoom: 19
-      }).addTo(map);
+      window.crearCapaMapbox().addTo(map);
       mapInitialized = true;
       console.log('✅ Mapa inicializado correctamente');
   }
@@ -10370,7 +10384,7 @@ window.abrirModalAgregarBarrio = function() {
   setTimeout(() => {
     if (!_mapNuevoBarrio) {
       _mapNuevoBarrio = L.map('mapa-nuevo-barrio', { zoomControl: true }).setView([4.5339, -75.6811], 14);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(_mapNuevoBarrio);
+      window.crearCapaMapbox().addTo(_mapNuevoBarrio);
       _mapNuevoBarrio.on('click', function(e) {
         const lat = parseFloat(e.latlng.lat.toFixed(6));
         const lng = parseFloat(e.latlng.lng.toFixed(6));
@@ -10511,7 +10525,7 @@ window.abrirMapeador = function() {
   setTimeout(() => {
     if (!_mapModal) {
       _mapModal = L.map('mapa-modal', { zoomControl: true }).setView([4.5339, -75.6811], 14);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(_mapModal);
+      window.crearCapaMapbox().addTo(_mapModal);
       _mapModal.on('click', _onMapClick);
     }
     _mapModal.invalidateSize();
