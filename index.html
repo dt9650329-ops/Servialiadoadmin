@@ -2470,7 +2470,7 @@ section h2 strong, section h2 span { color: var(--accent); }
 <!-- Capa de mapa estilo Mapbox Light (usada por los 3 mapas del admin) -->
 <script>
   // 👉 Pega aquí tu token público de Mapbox (empieza por "pk.")
-  window.MAPBOX_TOKEN = 'pk.eyJ1IjoiZGllZ29mdG9ycmVzYSIsImEiOiJjbXVvOWpjNjIwMGF2MndvZ216d3U5dnQ5In0.B0O9sdv3P-VInWD3ZcsnuQ';
+  window.MAPBOX_TOKEN = 'pk.eyJ1IjoiZGllZ29mdG9ycmVzYSIsImEiOiJjbXVvYnZjbjcwMTMxMnpvbXhkMWVlMTFzIn0.omny2SoJ26gFs7XKsbNc5A';
   (function(){var st=document.createElement('style');st.textContent='.leaflet-tile-pane{filter:saturate(.8)}';document.head.appendChild(st);})(); window.crearCapaMapbox = function () {
     if (!window.MAPBOX_TOKEN || window.MAPBOX_TOKEN.indexOf('pk.') !== 0) {
       console.warn('⚠️ Sin token de Mapbox: usando OpenStreetMap de respaldo');
@@ -2478,10 +2478,27 @@ section h2 strong, section h2 span { color: var(--accent); }
         attribution: '© OpenStreetMap contributors', maxZoom: 19
       });
     }
-    return L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=' + window.MAPBOX_TOKEN, {
+    var capaMb = L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=' + window.MAPBOX_TOKEN, {
       tileSize: 512, zoomOffset: -1, maxZoom: 19,
-      attribution: '© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      attribution: '\u00a9 <a href="https://www.mapbox.com/about/maps/">Mapbox</a> \u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     });
+    // Si Mapbox falla (token invalido/restringido, sin cuota), cambia solo a un mapa de respaldo
+    var errMb = 0, okMb = 0, yaRespaldo = false;
+    capaMb.on('tileload', function () { okMb++; });
+    capaMb.on('tileerror', function () {
+      errMb++;
+      if (yaRespaldo || okMb > 0 || errMb < 3) return;
+      yaRespaldo = true;
+      console.warn('\u26a0\ufe0f Mapbox no cargo tiles; usando mapa de respaldo');
+      var mapa = capaMb._map;
+      if (mapa) {
+        mapa.removeLayer(capaMb);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          subdomains: 'abcd', maxZoom: 19, attribution: '\u00a9 OpenStreetMap contributors \u00a9 CARTO'
+        }).addTo(mapa);
+      }
+    });
+    return capaMb;
   };
 </script>
 <script type="module">
