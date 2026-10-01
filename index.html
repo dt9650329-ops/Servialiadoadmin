@@ -4448,7 +4448,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       return div.innerHTML;
     }
 
-    function pintarMensajeIAAdmin(texto, esAdmin, esAlerta) {
+    function pintarMensajeIAAdmin(texto, esAdmin, esAlerta, ts) {
       const box = document.getElementById('iaAdminChatBox');
       if (!box) return;
       const wrap = document.createElement('div');
@@ -4461,7 +4461,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
         wrap.style.border = '1px solid #F59E0B';
         wrap.style.background = 'rgba(245,158,11,0.08)';
       }
-      const hora = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+      const hora = new Date(ts || Date.now()).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
       wrap.innerHTML = '<span>' + escaparHtmlIAAdmin(texto).replace(/\n/g, '<br>') + '</span><span class="chat-time">' + hora + '</span>';
       box.appendChild(wrap);
       box.scrollTop = box.scrollHeight;
@@ -4589,7 +4589,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           if (box) box.innerHTML = '';
           _historialCargadoIAAdmin = true;
         }
-        pintarMensajeIAAdmin(m.content, m.role === 'user', m.esAlerta === true);
+        pintarMensajeIAAdmin(m.content, m.role === 'user', m.esAlerta === true, m.ts);
 
         // 🆕 Si la herramienta abrirFormularioAgregarBarrio se activó en el
         // backend, el mensaje trae accion:'agregarBarrio' — se abre el mismo
