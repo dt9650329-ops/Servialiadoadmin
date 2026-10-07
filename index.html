@@ -8905,6 +8905,7 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
       const countLocal = document.getElementById('tarifa-count-local');
       const countNatural = document.getElementById('tarifa-count-natural');
       if (statusEl) statusEl.textContent = '';
+      if (window._cargarSalidasPerimetro) window._cargarSalidasPerimetro();
 
       // 1) Cargar la tabla de tarifas — esto es lo importante, así que va
       //    en su propio try/catch y NO debe fallar por el conteo de abajo.
@@ -8968,13 +8969,97 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
           const kmMaximoAutomatico = parseFloat(document.getElementById(`tarifa-kmmax-${tipo}`)?.value) || TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].kmMaximoAutomatico;
           nuevaConfig[tipo] = { tramos, masAllaBase, masAllaPorKm, kmMaximoAutomatico };
         }
-        await set(dbRef(db, 'config_tarifas/armenia'), nuevaConfig);
+        await update(dbRef(db, 'config_tarifas/armenia'), nuevaConfig); // update (no set): conserva salidas y fueraPorKm
         if (statusEl) { statusEl.style.color = '#10B981'; statusEl.textContent = '✅ Guardado — ya se refleja en todas las cotizaciones'; }
         setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 4000);
       } catch (e) {
         console.error('Error al guardar tarifas de cliente:', e);
         if (statusEl) { statusEl.style.color = '#EF4444'; statusEl.textContent = 'Error al guardar: ' + e.message; }
       }
+    };
+
+    // ── SALIDAS DEL PERÍMETRO URBANO ──
+    // Firebase: config_tarifas/armenia/salidas/{id} = { nombre, lat, lng } y config_tarifas/armenia/fueraPorKm
+    let _mapPerimetro = null, _pinPerimetro = null, _capaSalidas = null, _puntoPerimetro = null;
+    function _statusPerimetro(msg, ok) {
+      const el = document.getElementById('perimetro-status');
+      if (!el) return;
+      el.style.color = ok === false ? '#EF4444' : '#10B981';
+      el.textContent = msg;
+      if (msg) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 4000);
+    }
+    window._cargarSalidasPerimetro = async function() {
+      const lista = document.getElementById('perimetro-lista');
+      if (!lista) return;
+      try {
+        const snap = await get(dbRef(db, 'config_tarifas/armenia'));
+        const cfg = snap.exists() ? snap.val() : {};
+        const inp = document.getElementById('perimetro-por-km');
+        if (inp) inp.value = cfg.fueraPorKm ?? 1300;
+        const salidas = cfg.salidas || {};
+        const ids = Object.keys(salidas);
+        lista.innerHTML = ids.length ? ids.map(id => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;">
+            <span style="font-size:13px;">📍 ${String(salidas[id].nombre || id).replace(/</g,'&lt;')} <small style="color:#777;">${salidas[id].lat}, ${salidas[id].lng}</small></span>
+            <button onclick="window._eliminarSalidaPerimetro('${id}')" style="background:#EF4444;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;">Quitar</button>
+          </div>`).join('') : '<div style="color:#777;font-size:12px;">Aún no hay salidas marcadas.</div>';
+        _pintarMapaPerimetro(salidas);
+      } catch (e) {
+        console.error('Error al cargar salidas del perímetro:', e);
+        lista.innerHTML = '<div style="color:#EF4444;font-size:12px;">Error al cargar: ' + e.message + '</div>';
+      }
+    };
+    function _pintarMapaPerimetro(salidas) {
+      setTimeout(() => {
+        const cont = document.getElementById('perimetro-mapa');
+        if (!cont || typeof L === 'undefined') return;
+        if (!_mapPerimetro) {
+          _mapPerimetro = L.map('perimetro-mapa', { zoomControl: true }).setView([4.5339, -75.6811], 12);
+          (window.crearCapaMapbox ? window.crearCapaMapbox() : L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png')).addTo(_mapPerimetro);
+          _capaSalidas = L.layerGroup().addTo(_mapPerimetro);
+          _mapPerimetro.on('click', (e) => {
+            _puntoPerimetro = { lat: parseFloat(e.latlng.lat.toFixed(6)), lng: parseFloat(e.latlng.lng.toFixed(6)) };
+            if (_pinPerimetro) _mapPerimetro.removeLayer(_pinPerimetro);
+            _pinPerimetro = L.circleMarker([_puntoPerimetro.lat, _puntoPerimetro.lng], { radius: 10, color: '#fff', weight: 3, fillColor: '#F59E0B', fillOpacity: 1 }).addTo(_mapPerimetro);
+            document.getElementById('perimetro-coords').textContent = `📍 ${_puntoPerimetro.lat}, ${_puntoPerimetro.lng} — pon el nombre y toca "Agregar salida"`;
+          });
+        }
+        _mapPerimetro.invalidateSize();
+        _capaSalidas.clearLayers();
+        Object.values(salidas || {}).forEach(sa => {
+          L.circleMarker([sa.lat, sa.lng], { radius: 8, color: '#fff', weight: 2, fillColor: '#10B981', fillOpacity: 1 })
+            .bindTooltip(String(sa.nombre || ''), { permanent: true, direction: 'top' }).addTo(_capaSalidas);
+        });
+      }, 250);
+    }
+    window._agregarSalidaPerimetro = async function() {
+      const nombre = (document.getElementById('perimetro-nombre')?.value || '').trim();
+      if (!nombre) { _statusPerimetro('Escribe el nombre de la salida', false); return; }
+      if (!_puntoPerimetro) { _statusPerimetro('Toca el mapa para marcar el punto', false); return; }
+      try {
+        await window.dbPush(dbRef(db, 'config_tarifas/armenia/salidas'), { nombre, lat: _puntoPerimetro.lat, lng: _puntoPerimetro.lng });
+        document.getElementById('perimetro-nombre').value = '';
+        document.getElementById('perimetro-coords').textContent = 'Toca el mapa en el punto donde termina la ciudad.';
+        if (_pinPerimetro && _mapPerimetro) { _mapPerimetro.removeLayer(_pinPerimetro); _pinPerimetro = null; }
+        _puntoPerimetro = null;
+        _statusPerimetro('✅ Salida agregada');
+        window._cargarSalidasPerimetro();
+      } catch (e) { console.error(e); _statusPerimetro('Error: ' + e.message, false); }
+    };
+    window._eliminarSalidaPerimetro = async function(id) {
+      if (!confirm('¿Quitar esta salida?')) return;
+      try {
+        await remove(dbRef(db, 'config_tarifas/armenia/salidas/' + id));
+        window._cargarSalidasPerimetro();
+      } catch (e) { console.error(e); _statusPerimetro('Error: ' + e.message, false); }
+    };
+    window._guardarFueraPorKm = async function() {
+      const v = Math.round(parseFloat(document.getElementById('perimetro-por-km')?.value) || 0);
+      if (v <= 0) { _statusPerimetro('Pon un valor mayor a 0', false); return; }
+      try {
+        await set(dbRef(db, 'config_tarifas/armenia/fueraPorKm'), v);
+        _statusPerimetro('✅ Guardado');
+      } catch (e) { console.error(e); _statusPerimetro('Error: ' + e.message, false); }
     };
 
     window._cargarSueldos = async function() {
@@ -9343,6 +9428,22 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
           style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;margin-top:4px;font-size:14px;">
       </div>
     </div>
+  </div>
+
+  <div style="background:#222;border:1px solid #333;border-radius:12px;padding:18px;margin-bottom:20px;">
+    <div style="font-weight:700;font-size:15px;margin-bottom:4px;">📍 Salidas del perímetro urbano</div>
+    <div style="color:#999;font-size:12px;margin-bottom:12px;">Marca en el mapa dónde termina la ciudad en cada carretera (Circasia, Montenegro, La Tebaida, Calarcá, Puerto Tapao...). Hasta ese punto se cobra la tarifa normal por tramos; desde ahí, el valor por km de abajo.</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+      <label style="font-size:12px;color:#ccc;white-space:nowrap;">$ por km fuera de la ciudad</label>
+      <input type="number" id="perimetro-por-km" min="0" step="100" placeholder="1300" style="width:110px;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
+      <button onclick="window._guardarFueraPorKm()" style="background:#F59E0B;color:#111;border:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">Guardar</button>
+    </div>
+    <div id="perimetro-lista" style="margin-bottom:12px;"></div>
+    <input type="text" id="perimetro-nombre" placeholder="Nombre (ej: Salida a Circasia)" style="width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;margin-bottom:8px;">
+    <div id="perimetro-mapa" style="height:280px;border-radius:10px;overflow:hidden;border:1px solid #333;"></div>
+    <div id="perimetro-coords" style="font-size:12px;color:#999;margin:8px 0;">Toca el mapa en el punto donde termina la ciudad.</div>
+    <button onclick="window._agregarSalidaPerimetro()" style="background:#10B981;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;">➕ Agregar salida</button>
+    <span id="perimetro-status" style="margin-left:10px;font-size:13px;color:#10B981;"></span>
   </div>
 
   <button onclick="window._guardarTarifasCliente()" style="background:#F59E0B;color:#111;border:none;padding:12px 20px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;">
