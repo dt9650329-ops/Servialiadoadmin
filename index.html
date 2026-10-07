@@ -8858,7 +8858,7 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
           { hastaKm: 5.9, precio: 6000 }, { hastaKm: 7.5, precio: 7000 },
           { hastaKm: 9.0, precio: 8000 }, { hastaKm: 10.5, precio: 9000 },
         ],
-        masAllaBase: 10000, masAllaPorKm: 1000, kmMaximoAutomatico: 30,
+        masAllaBase: 0, masAllaPorKm: 1000, kmMaximoAutomatico: 30,
       },
       natural: {
         tramos: [
@@ -8866,7 +8866,7 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
           { hastaKm: 5.9, precio: 6000 }, { hastaKm: 7.5, precio: 7000 },
           { hastaKm: 9.0, precio: 8000 }, { hastaKm: 10.5, precio: 9000 },
         ],
-        masAllaBase: 10000, masAllaPorKm: 1000, kmMaximoAutomatico: 30,
+        masAllaBase: 0, masAllaPorKm: 1000, kmMaximoAutomatico: 30,
       },
     };
 
@@ -8915,10 +8915,8 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
         ['local', 'natural'].forEach(tipo => {
           const cfg = config[tipo] || TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo];
           _pintarTramosTarifa(tipo, cfg.tramos || TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].tramos);
-          const inputBase = document.getElementById(`tarifa-masalla-base-${tipo}`);
           const inputPorKm = document.getElementById(`tarifa-masalla-porkm-${tipo}`);
           const inputKmMax = document.getElementById(`tarifa-kmmax-${tipo}`);
-          if (inputBase) inputBase.value = cfg.masAllaBase ?? TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].masAllaBase;
           if (inputPorKm) inputPorKm.value = cfg.masAllaPorKm ?? TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].masAllaPorKm;
           if (inputKmMax) inputKmMax.value = cfg.kmMaximoAutomatico ?? TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].kmMaximoAutomatico;
         });
@@ -8964,7 +8962,7 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
         const nuevaConfig = {};
         for (const tipo of ['local', 'natural']) {
           const tramos = _leerTramosTarifa(tipo);
-          const masAllaBase = Math.round(parseFloat(document.getElementById(`tarifa-masalla-base-${tipo}`)?.value) || 0);
+          const masAllaBase = 0; // la base fija ya no se usa: más allá del último tramo = precio del último tramo + $/km
           const masAllaPorKm = Math.round(parseFloat(document.getElementById(`tarifa-masalla-porkm-${tipo}`)?.value) || 0);
           const kmMaximoAutomatico = parseFloat(document.getElementById(`tarifa-kmmax-${tipo}`)?.value) || TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].kmMaximoAutomatico;
           nuevaConfig[tipo] = { tramos, masAllaBase, masAllaPorKm, kmMaximoAutomatico };
@@ -9399,10 +9397,8 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
       <div style="color:#999;font-size:12px;margin-bottom:12px;">Negocios / locales de venta registrados como tipo "local".</div>
       <div id="tarifa-tramos-local" style="margin-bottom:10px;"></div>
       <div style="border-top:1px solid #333;padding-top:10px;margin-top:6px;">
-        <label style="font-size:12px;color:#ccc;">Más allá del último tramo: base $ + $/km adicional</label>
+        <label style="font-size:12px;color:#ccc;">$ por km adicional (más allá del último tramo y fuera del perímetro urbano)</label>
         <div style="display:flex;gap:8px;margin-top:4px;">
-          <input type="number" id="tarifa-masalla-base-local" min="0" step="100" placeholder="Base $"
-            style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
           <input type="number" id="tarifa-masalla-porkm-local" min="0" step="100" placeholder="$/km"
             style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
         </div>
@@ -9416,10 +9412,8 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
       <div style="color:#999;font-size:12px;margin-bottom:12px;">Clientes registrados como tipo "natural" (piden para uso propio).</div>
       <div id="tarifa-tramos-natural" style="margin-bottom:10px;"></div>
       <div style="border-top:1px solid #333;padding-top:10px;margin-top:6px;">
-        <label style="font-size:12px;color:#ccc;">Más allá del último tramo: base $ + $/km adicional</label>
+        <label style="font-size:12px;color:#ccc;">$ por km adicional (más allá del último tramo y fuera del perímetro urbano)</label>
         <div style="display:flex;gap:8px;margin-top:4px;">
-          <input type="number" id="tarifa-masalla-base-natural" min="0" step="100" placeholder="Base $"
-            style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
           <input type="number" id="tarifa-masalla-porkm-natural" min="0" step="100" placeholder="$/km"
             style="width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
         </div>
@@ -9432,12 +9426,8 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
 
   <div style="background:#222;border:1px solid #333;border-radius:12px;padding:18px;margin-bottom:20px;">
     <div style="font-weight:700;font-size:15px;margin-bottom:4px;">📍 Salidas del perímetro urbano</div>
-    <div style="color:#999;font-size:12px;margin-bottom:12px;">Marca en el mapa dónde termina la ciudad en cada carretera (Circasia, Montenegro, La Tebaida, Calarcá, Puerto Tapao...). Hasta ese punto se cobra la tarifa normal por tramos; desde ahí, el valor por km de abajo.</div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-      <label style="font-size:12px;color:#ccc;white-space:nowrap;">$ por km fuera de la ciudad</label>
-      <input type="number" id="perimetro-por-km" min="0" step="100" placeholder="1300" style="width:110px;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;">
-      <button onclick="window._guardarFueraPorKm()" style="background:#F59E0B;color:#111;border:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">Guardar</button>
-    </div>
+    <div style="color:#999;font-size:12px;margin-bottom:12px;">Marca en el mapa dónde termina la ciudad en cada carretera (Circasia, Montenegro, La Tebaida, Calarcá, Puerto Tapao...). Hasta ese punto se cobra la tarifa normal por tramos; desde ahí, el $ por km adicional de cada tipo de cliente.</div>
+    <div style="color:#bbb;font-size:12px;margin-bottom:12px;">El valor por km de afuera es el de cada tipo de cliente (tablas de arriba: Clientes con Local / Persona Natural).</div>
     <div id="perimetro-lista" style="margin-bottom:12px;"></div>
     <input type="text" id="perimetro-nombre" placeholder="Nombre (ej: Salida a Circasia)" style="width:100%;box-sizing:border-box;padding:8px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:14px;margin-bottom:8px;">
     <div id="perimetro-mapa" style="height:280px;border-radius:10px;overflow:hidden;border:1px solid #333;"></div>
