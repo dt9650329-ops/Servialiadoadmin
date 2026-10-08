@@ -8962,6 +8962,13 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
         const nuevaConfig = {};
         for (const tipo of ['local', 'natural']) {
           const tramos = _leerTramosTarifa(tipo);
+          // 🆕 Un precio entre 1 y 99 casi seguro es "10.000" escrito con punto (el campo numérico lo lee como 10).
+          for (const tr of tramos) {
+            if (tr.precio > 0 && tr.precio < 100) {
+              if (confirm(`El tramo hasta ${tr.hastaKm} km (${tipo}) tiene precio $${tr.precio}. ¿Quisiste decir $${tr.precio * 1000}?\n\nAceptar = corregir a $${tr.precio * 1000}\nCancelar = detener el guardado`)) { tr.precio = tr.precio * 1000; }
+              else { if (statusEl) { statusEl.style.color = '#EF4444'; statusEl.textContent = 'Corrige el precio del tramo (escríbelo sin puntos, ej. 10000) y vuelve a guardar.'; } return; }
+            }
+          }
           const masAllaBase = 0; // la base fija ya no se usa: más allá del último tramo = precio del último tramo + $/km
           const masAllaPorKm = Math.round(parseFloat(document.getElementById(`tarifa-masalla-porkm-${tipo}`)?.value) || 0);
           const kmMaximoAutomatico = parseFloat(document.getElementById(`tarifa-kmmax-${tipo}`)?.value) || TARIFAS_ARMENIA_DEFAULT_ADMIN[tipo].kmMaximoAutomatico;
