@@ -8986,6 +8986,7 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
     // ── SALIDAS DEL PERÍMETRO URBANO ──
     // Firebase: config_tarifas/armenia/salidas/{id} = { nombre, lat, lng } y config_tarifas/armenia/fueraPorKm
     let _mapPerimetro = null, _pinPerimetro = null, _capaSalidas = null, _puntoPerimetro = null;
+    let _capaContorno = null, _puntosContorno = [], _salidasActuales = {}; // contorno de la ciudad (poligono)
     function _statusPerimetro(msg, ok) {
       const el = document.getElementById('perimetro-status');
       if (!el) return;
@@ -9008,6 +9009,11 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
             <span style="font-size:13px;">📍 ${String(salidas[id].nombre || id).replace(/</g,'&lt;')} <small style="color:#777;">${salidas[id].lat}, ${salidas[id].lng}</small></span>
             <button onclick="window._eliminarSalidaPerimetro('${id}')" style="background:#EF4444;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;">Quitar</button>
           </div>`).join('') : '<div style="color:#777;font-size:12px;">Aún no hay salidas marcadas.</div>';
+        const _pp = cfg.perimetro && cfg.perimetro.puntos;
+        _puntosContorno = (Array.isArray(_pp) ? _pp : Object.values(_pp || {}))
+          .filter(p => p && typeof p.lat === 'number' && typeof p.lng === 'number')
+          .map(p => ({ lat: p.lat, lng: p.lng }));
+        _salidasActuales = salidas;
         _pintarMapaPerimetro(salidas);
       } catch (e) {
         console.error('Error al cargar salidas del perímetro:', e);
@@ -9022,6 +9028,7 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
           _mapPerimetro = L.map('perimetro-mapa', { zoomControl: true }).setView([4.5339, -75.6811], 12);
           (window.crearCapaMapbox ? window.crearCapaMapbox() : L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png')).addTo(_mapPerimetro);
           _capaSalidas = L.layerGroup().addTo(_mapPerimetro);
+          _capaContorno = L.layerGroup().addTo(_mapPerimetro);
           _mapPerimetro.on('click', (e) => {
             _puntoPerimetro = { lat: parseFloat(e.latlng.lat.toFixed(6)), lng: parseFloat(e.latlng.lng.toFixed(6)) };
             if (_pinPerimetro) _mapPerimetro.removeLayer(_pinPerimetro);
@@ -9035,6 +9042,7 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
           L.circleMarker([sa.lat, sa.lng], { radius: 8, color: '#fff', weight: 2, fillColor: '#10B981', fillOpacity: 1 })
             .bindTooltip(String(sa.nombre || ''), { permanent: true, direction: 'top' }).addTo(_capaSalidas);
         });
+        _pintarContorno();
       }, 250);
     }
     window._agregarSalidaPerimetro = async function() {
@@ -9064,6 +9072,81 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
       try {
         await set(dbRef(db, 'config_tarifas/armenia/fueraPorKm'), v);
         _statusPerimetro('✅ Guardado');
+      } catch (e) { console.error(e); _statusPerimetro('Error: ' + e.message, false); }
+    };
+
+
+    // ── CONTORNO DE LA CIUDAD (poligono que une los puntos) ──
+    // Firebase: config_tarifas/armenia/perimetro = { puntos:[{lat,lng},...], actualizado }
+    // El servidor usa este contorno para saber si un punto esta DENTRO o FUERA de la ciudad.
+    // Sin contorno propio, usa el poligono que se arma uniendo las salidas (linea verde punteada).
+    function _ordenarSalidasEnPoligono(salidas) {
+      const sal = Object.values(salidas || {}).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number');
+      if (!sal.length) return [];
+      const cx = sal.reduce((n, s) => n + s.lat, 0) / sal.length;
+      const cy = sal.reduce((n, s) => n + s.lng, 0) / sal.length;
+      return [...sal].sort((u, v) => Math.atan2(u.lat - cx, u.lng - cy) - Math.atan2(v.lat - cx, v.lng - cy));
+    }
+    function _pintarContorno() {
+      if (!_mapPerimetro || !_capaContorno || typeof L === 'undefined') return;
+      _capaContorno.clearLayers();
+      let pts = _puntosContorno, color = '#F59E0B', dash = null;
+      if (_puntosContorno.length < 3) {
+        const porSalidas = _ordenarSalidasEnPoligono(_salidasActuales);
+        if (porSalidas.length >= 3) { pts = porSalidas; color = '#10B981'; dash = '6 6'; }
+      }
+      if (pts.length >= 2) {
+        (pts.length >= 3 ? L.polygon : L.polyline)(pts.map(p => [p.lat, p.lng]), { color, weight: 3, dashArray: dash, fillColor: color, fillOpacity: 0.08 }).addTo(_capaContorno);
+      }
+      _puntosContorno.forEach((p, i) => {
+        L.circleMarker([p.lat, p.lng], { radius: 6, color: '#fff', weight: 2, fillColor: '#F59E0B', fillOpacity: 1 })
+          .bindTooltip(String(i + 1), { permanent: true, direction: 'center' }).addTo(_capaContorno);
+      });
+      const info = document.getElementById('contorno-info');
+      if (info) {
+        info.textContent = _puntosContorno.length >= 3
+          ? `Contorno propio: ${_puntosContorno.length} puntos (naranja). Es el que usa el servidor.`
+          : (_puntosContorno.length
+              ? `Llevas ${_puntosContorno.length} punto(s); faltan ${3 - _puntosContorno.length} o más para cerrar el contorno.`
+              : 'Sin contorno propio: el servidor usa la línea verde punteada que une tus salidas.');
+      }
+    }
+    window._agregarPuntoContorno = function() {
+      if (!_puntoPerimetro) { _statusPerimetro('Toca el mapa para marcar el punto', false); return; }
+      _puntosContorno.push({ lat: _puntoPerimetro.lat, lng: _puntoPerimetro.lng });
+      if (_pinPerimetro && _mapPerimetro) { _mapPerimetro.removeLayer(_pinPerimetro); _pinPerimetro = null; }
+      _puntoPerimetro = null;
+      document.getElementById('perimetro-coords').textContent = 'Toca el mapa en el punto donde termina la ciudad.';
+      _pintarContorno();
+      _statusPerimetro('Punto ' + _puntosContorno.length + ' agregado. Recuerda tocar "Guardar contorno".');
+    };
+    window._quitarUltimoPuntoContorno = function() {
+      if (!_puntosContorno.length) return;
+      _puntosContorno.pop();
+      _pintarContorno();
+    };
+    window._contornoDesdeSalidas = function() {
+      const ord = _ordenarSalidasEnPoligono(_salidasActuales);
+      if (ord.length < 3) { _statusPerimetro('Necesitas al menos 3 salidas marcadas', false); return; }
+      _puntosContorno = ord.map(s => ({ lat: s.lat, lng: s.lng }));
+      _pintarContorno();
+      _statusPerimetro('Contorno armado con tus salidas. Revisa el mapa y toca "Guardar contorno".');
+    };
+    window._guardarContorno = async function() {
+      if (_puntosContorno.length < 3) { _statusPerimetro('Marca al menos 3 puntos para cerrar el contorno', false); return; }
+      try {
+        await set(dbRef(db, 'config_tarifas/armenia/perimetro'), { puntos: _puntosContorno, actualizado: Date.now() });
+        _pintarContorno();
+        _statusPerimetro('✅ Contorno guardado (' + _puntosContorno.length + ' puntos)');
+      } catch (e) { console.error(e); _statusPerimetro('Error: ' + e.message, false); }
+    };
+    window._borrarContorno = async function() {
+      if (!confirm('¿Borrar el contorno propio? El servidor volverá a usar el polígono que une las salidas.')) return;
+      try {
+        await remove(dbRef(db, 'config_tarifas/armenia/perimetro'));
+        _puntosContorno = [];
+        _pintarContorno();
+        _statusPerimetro('Contorno borrado');
       } catch (e) { console.error(e); _statusPerimetro('Error: ' + e.message, false); }
     };
 
@@ -9441,6 +9524,18 @@ onValue(dbRef(db, 'barrios_sugeridos'), snap => {
     <div id="perimetro-coords" style="font-size:12px;color:#999;margin:8px 0;">Toca el mapa en el punto donde termina la ciudad.</div>
     <button onclick="window._agregarSalidaPerimetro()" style="background:#10B981;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;">➕ Agregar salida</button>
     <span id="perimetro-status" style="margin-left:10px;font-size:13px;color:#10B981;"></span>
+    <div style="border-top:1px solid #333;margin-top:16px;padding-top:14px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;">🔷 Contorno de la ciudad</div>
+      <div style="color:#999;font-size:12px;margin-bottom:8px;">Toca el mapa y luego "Agregar punto al contorno". Ve rodeando la ciudad en orden (sin cruzar líneas). El servidor usa este contorno para saber si una dirección está dentro o fuera. Para el precio también hace falta una salida marcada en cada carretera.</div>
+      <div id="contorno-info" style="font-size:12px;color:#F59E0B;margin-bottom:10px;"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button onclick="window._agregarPuntoContorno()" style="background:#F59E0B;color:#111;border:none;padding:10px 12px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">🔷 Agregar punto al contorno</button>
+        <button onclick="window._quitarUltimoPuntoContorno()" style="background:#374151;color:#fff;border:none;padding:10px 12px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">↩️ Quitar último</button>
+        <button onclick="window._contornoDesdeSalidas()" style="background:#374151;color:#fff;border:none;padding:10px 12px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">⚙️ Armar con mis salidas</button>
+        <button onclick="window._guardarContorno()" style="background:#10B981;color:#fff;border:none;padding:10px 12px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">💾 Guardar contorno</button>
+        <button onclick="window._borrarContorno()" style="background:#EF4444;color:#fff;border:none;padding:10px 12px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">🗑️ Borrar contorno</button>
+      </div>
+    </div>
   </div>
 
   <button onclick="window._guardarTarifasCliente()" style="background:#F59E0B;color:#111;border:none;padding:12px 20px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;">
