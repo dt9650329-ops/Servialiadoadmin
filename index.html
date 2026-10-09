@@ -5219,6 +5219,66 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
   // │ [JS-28] MOSTRAR HISTORIAL - LISTA DE REPARTIDORES       │
   // └─────────────────────────────────────────────────────────┘
   // ==================== MOSTRAR HISTORIAL - LISTA DE REPARTIDORES ====================
+  // 🆕 2026-10-08: helpers del historial por repartidor (completados / cancelados / dinero de domicilios)
+  window._escHTMLHist = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  window._parseCOPHist = (raw) => {
+    if (!raw && raw !== 0) return 0;
+    if (typeof raw === 'number') return raw;
+    const limpio = String(raw).replace(/[$\s.]/g, '').replace(',', '.');
+    return parseFloat(limpio) || 0;
+  };
+  // Valor del DOMICILIO de un pedido (nunca el valor de los productos). Misma regla que usa la app del repartidor.
+  window._valorDomicilioPedido = (p) => {
+    let num = 0;
+    if (p.tipo === 'compra_tienda') {
+      const raw = (p.montoDomicilioCliente != null) ? p.montoDomicilioCliente : (p.montoDomicilio != null ? p.montoDomicilio : null);
+      if (raw != null) return Math.max(0, window._parseCOPHist(raw)); // incluso si es 0 (domicilio gratis por cupón)
+    } else if (p.montoTotal) {
+      num = window._parseCOPHist(p.montoTotal);
+    }
+    if (!num) num = window._parseCOPHist(p.valorDomicilio || p.costoEnvio || p.domicilio || p.tarifaDomicilio || p.montoEnvio || p.tarifa || p.flete || p.costoServicio || 0);
+    if (!num) num = window._parseCOPHist(p.precio || p.total || p.monto || '');
+    return Math.max(0, num);
+  };
+  // Momento que define en qué DÍA cuenta el pedido: cuando se entregó / se canceló (y si no hay, cuando se asignó)
+  window._tsEventoPedido = (p) => {
+    const cls = normalizeEstadoClass(p.estado || p.estadoHistorial);
+    const base = p.timestampAsignacion || p.timestampCreacion || 0;
+    if (cls === 'completado') return p.tiempoCompletado || p.timestampCompletado || p.timestampEntregado || base;
+    if (cls === 'cancelado') return p.tiempoCancelado || p.timestampCancelado || p.timestampCancelacion || base;
+    return base;
+  };
+  window._resumenDiaRepartidor = (lista) => {
+    const r = { completados: [], cancelados: [], enCurso: [], totalDomicilios: 0 };
+    (lista || []).forEach(p => {
+      const cls = normalizeEstadoClass(p.estado || p.estadoHistorial);
+      if (cls === 'completado') { r.completados.push(p); r.totalDomicilios += window._valorDomicilioPedido(p); }
+      else if (cls === 'cancelado') r.cancelados.push(p);
+      else r.enCurso.push(p);
+    });
+    return r;
+  };
+  window._lineaCierreHTML = (p, estadoClass) => {
+    const E = window._escHTMLHist;
+    const dom = window._valorDomicilioPedido(p).toLocaleString('es-CO');
+    if (estadoClass === 'cancelado') {
+      const motivo = p.motivoCancelacion || p.motivo || p.motivoCancelado || 'No especificado';
+      const quien = p.canceladoPor || 'No especificado';
+      const cuando = p.tiempoCancelado || p.timestampCancelado || p.timestampCancelacion;
+      return `<div class="detalle-linea" style="border-left:3px solid #e74c3c;padding-left:6px;">
+                <span>Motivo:</span><span class="valor" style="color:#ff8a80;">${E(motivo)}</span></div>
+              <div class="detalle-linea"><span>Cancelado por:</span><span class="valor">${E(quien)}${cuando ? ' · ' + formatTimestamp(cuando, true) : ''}</span></div>
+              <div class="detalle-linea"><span>Domicilio (no cobrado):</span><span class="valor">$${dom}</span></div>`;
+    }
+    if (estadoClass === 'completado') {
+      const cuando = p.tiempoCompletado || p.timestampCompletado || p.timestampEntregado;
+      return `<div class="detalle-linea" style="border-left:3px solid #2ecc71;padding-left:6px;">
+                <span>Domicilio a entregar:</span><span class="valor" style="color:#2ecc71;font-weight:700;">$${dom}</span></div>
+              ${cuando ? `<div class="detalle-linea"><span>Hora de entrega:</span><span class="valor">${formatTimestamp(cuando, true)}</span></div>` : ''}`;
+    }
+    return '';
+  };
+
   window.mostrarListaRepartidoresHistorial = function() {
       DOMElements.listaHistorialPedidos.innerHTML = "";
       DOMElements.historialPedidosTitle.innerHTML = '📚 Historial de Pedidos Asignados';
@@ -5233,26 +5293,42 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
           DOMElements.listaHistorialPedidos.innerHTML = "<p>No hay historial de pedidos aún.</p>";
           return;
       }
-      const pedidosPorRepartidorTemp = Object.keys(allPedidos).reduce((acc, key) => {
+      // 🆕 2026-10-08: se agrupa por NOMBRE (no por cuenta): si un repartidor tiene dos cuentas/UID,
+      // sus pedidos salen juntos en una sola casilla.
+      const _normNombreRep = (n) => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+      const _grupos = {};
+      Object.keys(allPedidos).forEach(key => {
           const pedido = allPedidos[key];
-          const repId = pedido.repartidorIdAsignado || 'id_desconocido';
-          if (!acc[repId]) {
-              acc[repId] = {
-                  nombre: pedido.repartidorNombre || repartidoresInfoHistorial[repId]?.nombre || 'Repartidor Desconocido',
-                  pedidos: []
-              };
-          }
-          acc[repId].pedidos.push({...pedido, id: key});
-          return acc;
-      }, {});
+          if (!pedido) return;
+          const uid = pedido.repartidorIdAsignado || pedido.repartidorUID || pedido.repartidorId || 'id_desconocido';
+          const nombre = repartidoresInfoHistorial[uid]?.nombre || pedido.repartidorNombre || 'Repartidor Desconocido';
+          const clave = _normNombreRep(nombre) || 'repartidor desconocido';
+          if (!_grupos[clave]) _grupos[clave] = { nombre, pedidos: [], ids: {} };
+          const ts = pedido.timestampAsignacion || pedido.timestampCreacion || 0;
+          _grupos[clave].ids[uid] = Math.max(_grupos[clave].ids[uid] || 0, ts);
+          _grupos[clave].pedidos.push({...pedido, id: key});
+      });
+      const pedidosPorRepartidorTemp = {};
+      Object.keys(_grupos).forEach(clave => {
+          const g = _grupos[clave];
+          const idsOrdenados = Object.keys(g.ids).sort((a, b) => g.ids[b] - g.ids[a]); // la cuenta más reciente primero
+          let repKey = idsOrdenados[0];
+          if (pedidosPorRepartidorTemp[repKey]) repKey = repKey + '_' + clave.replace(/[^a-z0-9]/g, '_');
+          pedidosPorRepartidorTemp[repKey] = {
+              nombre: g.nombre,
+              pedidos: g.pedidos,
+              ids: idsOrdenados,
+              online: idsOrdenados.some(id => isRepartidorOnline(repartidoresInfoHistorial[id]))
+          };
+      });
       window.pedidosPorRepartidorCache = pedidosPorRepartidorTemp; 
       const repartidoresConPedidos = Object.keys(window.pedidosPorRepartidorCache).filter(id => window.pedidosPorRepartidorCache[id].pedidos.length > 0);
       const sortedRepartidores = repartidoresConPedidos.sort((a, b) => {
           const repA = repartidoresInfoHistorial[a];
           const repB = repartidoresInfoHistorial[b];
           if (repA && repB) {
-             const onlineA = isRepartidorOnline(repA) ? 1 : 0; 
-             const onlineB = isRepartidorOnline(repB) ? 1 : 0;
+             const onlineA = window.pedidosPorRepartidorCache[a].online ? 1 : 0; 
+             const onlineB = window.pedidosPorRepartidorCache[b].online ? 1 : 0;
              if (onlineA !== onlineB) return onlineB - onlineA; 
           }
           return window.pedidosPorRepartidorCache[a].nombre.localeCompare(window.pedidosPorRepartidorCache[b].nombre);
@@ -5260,7 +5336,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
       sortedRepartidores.forEach(repId => {
           const repData = window.pedidosPorRepartidorCache[repId];
           const repInfo = repartidoresInfoHistorial[repId];
-          const isOnline = isRepartidorOnline(repInfo);
+          const isOnline = !!repData.online;
           const statusColor = isOnline ? '#27ae60' : '#E0E0E0';
           const statusText = isOnline ? 'Online' : 'Offline';
           const perfilActivo = repInfo?.perfilActivo !== false;
@@ -5270,7 +5346,7 @@ await push(dbRef(db, `chats/${clienteActivo}`), {
               <div class="historial-item-container" style="flex:1;min-width:0;cursor:pointer;"
                    onclick="window.mostrarHistorialPorFecha('${repId}', window.pedidosPorRepartidorCache['${repId}'])">
                   <strong>🚶 ${repData.nombre}</strong>
-                  <span>${repData.pedidos.length} pedidos asignados</span>
+                  <span>${repData.pedidos.length} pedidos${repData.ids && repData.ids.length > 1 ? ' (' + repData.ids.length + ' cuentas unidas)' : ''}</span>
               </div>
               <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">
                 <span style="font-weight:bold;color:${statusColor};font-size:12px;">${statusText}</span>
@@ -5300,7 +5376,9 @@ ${activar?'Podrá conectarse y recibir pedidos.':'NO podrá conectarse ni recibi
     try {
       const updates = { perfilActivo: activar };
       if (!activar) updates.online = false;
-      await update(dbRef(db, `repartidores_info/${repId}`), updates);
+      const _ids = ((window.pedidosPorRepartidorCache || {})[repId]?.ids || [repId]).filter(id => id && repartidoresInfoHistorial[id]);
+      if (!_ids.length) _ids.push(repId);
+      for (const _id of _ids) await update(dbRef(db, `repartidores_info/${_id}`), updates);
       if (lbl) { lbl.textContent = activar?'Activo':'Bloqueado'; lbl.style.color = activar?'#27ae60':'#e74c3c'; }
     } catch(e) { alert('Error: '+e.message); if (chk) chk.checked = !activar; }
   };
@@ -5320,7 +5398,7 @@ ${activar?'Podrá conectarse y recibir pedidos.':'NO podrá conectarse ni recibi
       if (window._adminCronoUnsubDetalle) { try { window._adminCronoUnsubDetalle(); } catch(e){} window._adminCronoUnsubDetalle = null; }
 
       const pedidosPorFecha = repData.pedidos.reduce((acc, pedido) => {
-          const timestamp = pedido.timestampAsignacion || pedido.timestampCreacion;
+          const timestamp = window._tsEventoPedido(pedido);
           const dateOnly = formatTimestamp(timestamp, false); 
           if (!acc[dateOnly]) {
               acc[dateOnly] = [];
@@ -5349,8 +5427,8 @@ ${activar?'Podrá conectarse y recibir pedidos.':'NO podrá conectarse ni recibi
               const item = document.createElement("div");
               item.classList.add("historial-step-item");
               const pedidosDelDia = pedidosPorFecha[date];
+              const _resDia = window._resumenDiaRepartidor(pedidosDelDia);
               const totalPedidos = pedidosDelDia.length;
-              const totalMonto = pedidosDelDia.reduce((sum, p) => sum + (p.montoTotal || 0), 0);
               // Convertir fecha DD/MM/YYYY → YYYY-MM-DD para leer historial Firebase
               const _toISODate = (d) => { const [dd,mm,yyyy] = d.split('/'); return `${yyyy}-${mm}-${dd}`; };
               const fechaISO = _toISODate(date);
@@ -5361,7 +5439,7 @@ ${activar?'Podrá conectarse y recibir pedidos.':'NO podrá conectarse ni recibi
               item.innerHTML = `
                   <div class="historial-item-container">
                       <strong>📅 ${date}</strong>
-                      <span>${totalPedidos} pedidos | $${totalMonto.toLocaleString('es-ES')}</span>
+                      <span>✅ ${_resDia.completados.length} completados · 💵 $${_resDia.totalDomicilios.toLocaleString('es-CO')} a entregar${_resDia.cancelados.length ? ' · ❌ ' + _resDia.cancelados.length + ' cancelados' : ''}${_resDia.enCurso.length ? ' · 🔄 ' + _resDia.enCurso.length + ' en curso' : ''}</span>
                   </div>
               `;
               item.addEventListener("click", () => window.mostrarDetallePedidos(repartidorId, repData.nombre, date, pedidosDelDia));
@@ -5387,7 +5465,28 @@ ${activar?'Podrá conectarse y recibir pedidos.':'NO podrá conectarse ni recibi
       if (window._adminCronoInterval) { clearInterval(window._adminCronoInterval); window._adminCronoInterval = null; }
       if (window._adminCronoUnsubDetalle) { try { window._adminCronoUnsubDetalle(); } catch(e){} window._adminCronoUnsubDetalle = null; }
 
-      pedidosDelDia.sort((a, b) => (b.timestampAsignacion || b.timestampCreacion) - (a.timestampAsignacion || a.timestampCreacion));
+      pedidosDelDia.sort((a, b) => window._tsEventoPedido(b) - window._tsEventoPedido(a));
+      const _res = window._resumenDiaRepartidor(pedidosDelDia);
+      const _resumenEl = document.createElement('div');
+      _resumenEl.style.cssText = 'background:#16213e;border:1px solid #2c3e66;border-radius:12px;padding:12px 14px;margin-bottom:6px;';
+      _resumenEl.innerHTML = `<div style="font-size:12px;color:#9aa;">Resumen del ${fecha}</div>
+        <div style="font-size:15px;margin-top:4px;">✅ <b>${_res.completados.length}</b> completados · ❌ <b>${_res.cancelados.length}</b> cancelados${_res.enCurso.length ? ` · 🔄 <b>${_res.enCurso.length}</b> en curso` : ''}</div>
+        <div style="font-size:20px;font-weight:800;color:#2ecc71;margin-top:6px;">💵 A entregar: $${_res.totalDomicilios.toLocaleString('es-CO')}</div>
+        <div style="font-size:11px;color:#8899aa;margin-top:2px;">Suma solo del valor de los domicilios completados (sin productos).</div>`;
+      DOMElements.listaHistorialPedidos.appendChild(_resumenEl);
+      const _mkHdr = (txt, color) => { const d = document.createElement('div'); d.style.cssText = `margin:14px 0 6px;padding:8px 12px;border-left:4px solid ${color};font-weight:800;font-size:14px;color:${color};`; d.textContent = txt; return d; };
+      const _mkCont = (vacioTxt, n) => { const c = document.createElement('div'); if (!n) c.innerHTML = `<div style="color:#888;font-size:12px;padding:4px 12px;">${vacioTxt}</div>`; return c; };
+      const _contComp = _mkCont('Ningún domicilio completado este día', _res.completados.length);
+      const _contCanc = _mkCont('Ningún domicilio cancelado este día', _res.cancelados.length);
+      const _contCurso = _mkCont('', 1);
+      DOMElements.listaHistorialPedidos.appendChild(_mkHdr(`✅ Completados (${_res.completados.length}) — $${_res.totalDomicilios.toLocaleString('es-CO')}`, '#2ecc71'));
+      DOMElements.listaHistorialPedidos.appendChild(_contComp);
+      DOMElements.listaHistorialPedidos.appendChild(_mkHdr(`❌ Cancelados (${_res.cancelados.length}) — con motivo`, '#e74c3c'));
+      DOMElements.listaHistorialPedidos.appendChild(_contCanc);
+      if (_res.enCurso.length) {
+        DOMElements.listaHistorialPedidos.appendChild(_mkHdr(`🔄 En curso (${_res.enCurso.length})`, '#f39c12'));
+        DOMElements.listaHistorialPedidos.appendChild(_contCurso);
+      }
       pedidosDelDia.forEach(pedido => {
           const timestamp = pedido.timestampAsignacion || pedido.timestampCreacion;
           const dateAsignacion = formatTimestamp(timestamp, true); 
@@ -5396,7 +5495,7 @@ ${activar?'Podrá conectarse y recibir pedidos.':'NO podrá conectarse ni recibi
           const estadoTexto = getEstadoTexto(estado);
           const nombreCliente = pedido.nombreCliente || pedido.cliente?.clienteNombre || pedido.cliente?.nombre || 'Sin nombre';
           const descripcion = pedido.descripcion || 'Sin descripción';
-          const montoTotal = pedido.montoTotal || 0;
+          const montoTotal = window._valorDomicilioPedido(pedido); // solo el domicilio, no los productos
           const item = document.createElement("div");
           item.classList.add("pedido-historial-item");
           item.setAttribute('data-pedido-id', pedido.id);
@@ -5449,6 +5548,7 @@ ${activar?'Podrá conectarse y recibir pedidos.':'NO podrá conectarse ni recibi
                   <span>Hora de Asignación:</span>
                   <span style="font-size: 11px; color: #A0A0A0;">${dateAsignacion}</span>
               </div>
+              ${window._lineaCierreHTML(pedido, estadoClass)}
               <div style="text-align:right;margin-top:6px;font-size:11px;color:#888;">👆 Toca para ver info completa</div>
               ${actionContainer}
           `;
@@ -5457,7 +5557,7 @@ ${activar?'Podrá conectarse y recibir pedidos.':'NO podrá conectarse ni recibi
             if (e.target.closest('button')) return;
             window.abrirDetallePedido(pedido);
           });
-          DOMElements.listaHistorialPedidos.appendChild(item);
+          (estadoClass === 'completado' ? _contComp : (estadoClass === 'cancelado' ? _contCanc : _contCurso)).appendChild(item);
       });
   }
   // ┌─────────────────────────────────────────────────────────┐
